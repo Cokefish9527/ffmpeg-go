@@ -1,6 +1,7 @@
 package service
 
 import (
+	"github.com/google/uuid"
 	"github.com/u2takey/ffmpeg-go"
 	"github.com/u2takey/ffmpeg-go/queue"
 )
@@ -34,9 +35,24 @@ func NewVideoEditorService(taskQueue queue.TaskQueue) *VideoEditorService {
 
 // SubmitTask 提交视频编辑任务
 func (s *VideoEditorService) SubmitTask(spec *ffmpeg.EditSpec) (string, error) {
-	// TODO: 实现任务提交逻辑
-	// 这里应该生成任务ID，创建任务对象，并将其添加到任务队列中
-	return "", nil
+	// 生成任务ID
+	taskID := uuid.New().String()
+	
+	// 创建任务对象
+	task := &queue.Task{
+		ID:       taskID,
+		Spec:     spec,
+		Status:   "pending",
+		Progress: 0.0,
+	}
+	
+	// 将任务添加到任务队列
+	err := s.taskQueue.Add(task)
+	if err != nil {
+		return "", err
+	}
+	
+	return taskID, nil
 }
 
 // GetTaskStatus 获取任务状态
@@ -47,7 +63,23 @@ func (s *VideoEditorService) GetTaskStatus(taskID string) (*queue.Task, error) {
 
 // CancelTask 取消任务
 func (s *VideoEditorService) CancelTask(taskID string) error {
-	// TODO: 实现取消任务逻辑
+	// 获取任务
+	task, err := s.taskQueue.Get(taskID)
+	if err != nil {
+		return err
+	}
+	
+	if task == nil {
+		return nil // 任务不存在，直接返回
+	}
+	
+	// 只有在任务未完成时才能取消
+	if task.Status == "pending" || task.Status == "processing" {
+		task.Status = "cancelled"
+		task.Error = "任务已被取消"
+		return s.taskQueue.Update(task)
+	}
+	
 	return nil
 }
 

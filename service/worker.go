@@ -113,18 +113,62 @@ func (w *Worker) Start() {
 
 // processTask 处理单个任务
 func (w *Worker) processTask(task *queue.Task) {
-	// TODO: 实现具体的任务处理逻辑
-	// 这里应该调用视频编辑服务来处理任务
-	
-	// 模拟任务处理过程
+	// 更新任务状态为处理中
 	task.Status = "processing"
 	task.Started = time.Now()
-	
-	// 模拟处理时间
-	time.Sleep(100 * time.Millisecond)
-	
-	// 更新任务状态
-	task.Status = "completed"
+
+	// 尝试将任务的Spec转换为EditSpec
+	spec, ok := task.Spec.(*ffmpeg.EditSpec)
+	if !ok {
+		// 如果转换失败，尝试通过map进行解析
+		if specMap, ok := task.Spec.(map[string]interface{}); ok {
+			// 创建一个新的EditSpec实例
+			spec = &ffmpeg.EditSpec{}
+
+			// 简化处理，实际项目中应该使用更完善的解析方法
+			if outPath, exists := specMap["outPath"]; exists {
+				if str, ok := outPath.(string); ok {
+					spec.OutPath = str
+				}
+			}
+
+			if width, exists := specMap["width"]; exists {
+				if num, ok := width.(float64); ok {
+					spec.Width = int(num)
+				}
+			}
+
+			if height, exists := specMap["height"]; exists {
+				if num, ok := height.(float64); ok {
+					spec.Height = int(num)
+				}
+			}
+
+			if fps, exists := specMap["fps"]; exists {
+				if num, ok := fps.(float64); ok {
+					spec.Fps = int(num)
+				}
+			}
+		}
+	}
+
+	// 如果仍然没有有效的spec，则返回错误
+	if spec == nil {
+		task.Status = "failed"
+		task.Error = "无效的视频编辑规范"
+		task.Finished = time.Now()
+		return
+	}
+
+	// 调用ffmpeg-go库进行视频编辑
+	err := ffmpeg.Edit(spec)
+	if err != nil {
+		task.Status = "failed"
+		task.Error = err.Error()
+	} else {
+		task.Status = "completed"
+		task.Result = spec.OutPath
+	}
+
 	task.Finished = time.Now()
-	task.Result = "Task completed successfully"
 }
