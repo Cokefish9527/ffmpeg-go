@@ -1,0 +1,9 @@
+# Git提交信息模板
+# 格式：type(scope): subject
+# type: feat(新功能) | fix(修复) | docs(文档) | style(格式) | refactor(重构) | test(测试) | chore(日常事务)
+
+# 提交信息示例：
+# feat(editor): 添加视频剪辑功能
+# fix(api): 修复任务状态查询接口的bug
+# docs(readme): 更新项目说明文档
+# refactor(service): 重构视频处理服务
