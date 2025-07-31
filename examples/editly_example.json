@@ -1,0 +1,57 @@
+{
+  "outPath": "./examples/sample_data/editly_output.mp4",
+  "width": 640,
+  "height": 480,
+  "fps": 25,
+  "defaults": {
+    "duration": 3,
+    "transition": {
+      "duration": 0.5,
+      "name": "fade"
+    }
+  },
+  "clips": [
+    {
+      "layers": [
+        {
+          "type": "video",
+          "path": "./examples/sample_data/in1.mp4"
+        }
+      ]
+    },
+    {
+      "layers": [
+        {
+          "type": "image",
+          "path": "./examples/sample_data/overlay.png"
+        }
+      ]
+    },
+    {
+      "layers": [
+        {
+          "type": "title",
+          "text": "Hello, ffmpeg-go!",
+          "color": "blue",
+          "fontSize": 32
+        }
+      ]
+    },
+    {
+      "layers": [
+        {
+          "type": "fill-color",
+          "color": "red"
+        },
+        {
+          "type": "title",
+          "text": "Red Background",
+          "color": "white"
+        }
+      ]
+    }
+  ],
+  "audioFilePath": "",
+  "keepSourceAudio": true,
+  "verbose": true
+}

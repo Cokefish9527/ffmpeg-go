@@ -84,10 +84,10 @@ func TestExampleScaleVideo(t *testing.T) {
 
 func TestExampleAddWatermark(t *testing.T) {
 	// show watermark with size 64:-1 in the top left corner after seconds 1
-	overlay := ffmpeg.Input("./sample_data/overlay.png").Filter("scale", ffmpeg.Args{"64:-1"})
+	overlay := ffmpeg.Input("./sample_data/logo.jpg").Filter("scale", ffmpeg.Args{"64:-1"})
 	err := ffmpeg.Filter(
 		[]*ffmpeg.Stream{
-			ffmpeg.Input("./sample_data/in1.mp4"),
+			ffmpeg.Input("./sample_data/in2.mp4"),
 			overlay,
 		}, "overlay", ffmpeg.Args{"10:10"}, ffmpeg.KwArgs{"enable": "gte(t,1)"}).
 		Output("./sample_data/out1.mp4").OverWriteOutput().ErrorToStdOut().Run()
@@ -95,8 +95,8 @@ func TestExampleAddWatermark(t *testing.T) {
 }
 
 func TestExampleCutVideoForGif(t *testing.T) {
-	err := ffmpeg.Input("./sample_data/in1.mp4", ffmpeg.KwArgs{"ss": "1"}).
-		Output("./sample_data/out1.gif", ffmpeg.KwArgs{"s": "320x240", "pix_fmt": "rgb24", "t": "3", "r": "3"}).
+	err := ffmpeg.Input("./sample_data/in2.mp4", ffmpeg.KwArgs{"ss": "1"}).
+		Output("./sample_data/out2.gif", ffmpeg.KwArgs{"s": "320x240", "pix_fmt": "rgb24", "t": "3", "r": "3"}).
 		OverWriteOutput().ErrorToStdOut().Run()
 	assert.Nil(t, err)
 }

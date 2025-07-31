@@ -28,6 +28,61 @@ ffmpeg version 4.2.4-1ubuntu0.1 Copyright (c) 2000-2020 the FFmpeg developers
 
 > **Note**: The actual version information displayed here may vary from one system to another; but if a message such as `ffmpeg: command not found` appears instead of the version information, FFmpeg is not properly installed.
 
+# New Feature: Editly-like Video Editor
+
+We've added a new high-level API inspired by [editly](https://github.com/mifi/editly) that makes it easy to create videos programmatically:
+
+```go
+spec := &ffmpeg.EditSpec{
+    OutPath: "./output.mp4",
+    Width:   640,
+    Height:  480,
+    Fps:     25,
+    Clips: []*ffmpeg.Clip{
+        {
+            Layers: []*ffmpeg.Layer{
+                {
+                    Type: "video",
+                    Path: "./input.mp4",
+                },
+            },
+        },
+        {
+            Layers: []*ffmpeg.Layer{
+                {
+                    Type: "title",
+                    Text: "Hello World",
+                    Color: "blue",
+                },
+            },
+        },
+    },
+    Verbose: true,
+}
+
+err := ffmpeg.Edit(spec)
+```
+
+Or load from a JSON file:
+
+```go
+editly, err := ffmpeg.FromFile("./editly_spec.json")
+if err != nil {
+    log.Fatal(err)
+}
+err = editly.Edit()
+```
+
+You can run the editly examples with:
+```bash
+go test -v ./examples -run TestExampleEditly
+```
+
+# Project Documentation
+
+- [Development Plan](development_plan.md) - Complete development plan for extending this library into a full-fledged video editing service
+- [Requirements Specification](requirements.md) - Detailed requirements specification for the video editing service
+
 # Examples
 
 ```go
