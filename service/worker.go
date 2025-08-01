@@ -2,39 +2,43 @@ package service
 
 import (
 	"context"
+	"fmt"
+	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 )
 
 // WorkerPool 工作池结构，用于控制并发任务数
 type WorkerPool struct {
-	maxWorkers int        // 最大工作协程数
-	taskQueue  chan *Task // 任务队列
-	semaphore  chan struct{}    // 信号量，用于限制并发数
-	workers    []*Worker        // 工作协程列表
-	ctx        context.Context  // 上下文，用于控制工作池生命周期
+	maxWorkers int                // 最大工作协程数
+	taskQueue  chan *Task         // 任务队列
+	semaphore  chan struct{}      // 信号量，用于限制并发数
+	workers    []*Worker          // 工作协程列表
+	ctx        context.Context    // 上下文，用于控制工作池生命周期
 	cancel     context.CancelFunc // 取消函数，用于停止工作池
 }
 
 // Worker 工作协程结构
 type Worker struct {
-	id     int              // 工作协程ID
-	pool   *WorkerPool      // 所属工作池
-	ctx    context.Context  // 上下文
+	id     int                // 工作协程ID
+	pool   *WorkerPool        // 所属工作池
+	ctx    context.Context    // 上下文
 	cancel context.CancelFunc // 取消函数
 }
 
 // NewWorkerPool 创建新的工作池实例
 func NewWorkerPool(maxWorkers int) *WorkerPool {
 	ctx, cancel := context.WithCancel(context.Background())
-	
+
 	pool := &WorkerPool{
 		maxWorkers: maxWorkers,
-		taskQueue:  make(chan *Task, 1000), // 任务队列缓冲区大小为1000
+		taskQueue:  make(chan *Task, 1000),          // 任务队列缓冲区大小为1000
 		semaphore:  make(chan struct{}, maxWorkers), // 信号量大小等于最大工作协程数
 		ctx:        ctx,
 		cancel:     cancel,
 	}
-	
+
 	// 创建并启动工作协程
 	pool.workers = make([]*Worker, maxWorkers)
 	for i := 0; i < maxWorkers; i++ {
@@ -48,7 +52,7 @@ func NewWorkerPool(maxWorkers int) *WorkerPool {
 		pool.workers[i] = worker
 		go worker.Start()
 	}
-	
+
 	return pool
 }
 
@@ -60,7 +64,7 @@ func (wp *WorkerPool) SubmitTask(task *Task) error {
 		return wp.ctx.Err()
 	default:
 	}
-	
+
 	// 将任务发送到任务队列
 	select {
 	case wp.taskQueue <- task:
@@ -80,7 +84,7 @@ func (wp *WorkerPool) Start() {
 func (wp *WorkerPool) Stop() {
 	// 取消上下文，通知所有工作协程停止
 	wp.cancel()
-	
+
 	// 等待一段时间让工作协程优雅退出
 	time.Sleep(100 * time.Millisecond)
 }
@@ -98,7 +102,7 @@ func (w *Worker) Start() {
 			case w.pool.semaphore <- struct{}{}:
 				// 处理任务
 				w.processTask(task)
-				
+
 				// 释放信号量
 				<-w.pool.semaphore
 			case <-w.ctx.Done():
@@ -149,20 +153,87 @@ func (w *Worker) processTask(task *Task) {
 	}
 
 	fps := 0
-	_ = fps // 显式忽略未使用变量
+	if fpsVal, exists := spec["fps"]; exists {
+		if num, ok := fpsVal.(float64); ok {
+			fps = int(num)
+		}
+	}
 
 	// 模拟视频编辑处理
 	// 实际项目中应该调用ffmpeg-go库进行视频编辑
+	// 这里我们模拟实际的视频处理操作
 	time.Sleep(2 * time.Second)
 
-	// 模拟处理结果
+	// 实际执行视频合并操作
 	if outPath != "" && width > 0 && height > 0 {
-		task.Status = "completed"
-		task.Result = outPath
+		err := w.mergeVideos(outPath, width, height, fps)
+		if err != nil {
+			task.Status = "failed"
+			task.Error = fmt.Sprintf("视频合并失败: %v", err)
+		} else {
+			task.Status = "completed"
+			task.Result = outPath
+		}
 	} else {
 		task.Status = "failed"
 		task.Error = "缺少必要的视频编辑参数"
 	}
 
 	task.Finished = time.Now()
+}
+
+// mergeVideos 合并视频文件
+func (w *Worker) mergeVideos(outPath string, width, height, fps int) error {
+	// 创建输入文件列表
+	inputFiles := []string{
+		"1.mp4",
+		"2.mp4",
+		"3.mp4",
+		"4.mp4",
+		"5.mp4",
+	}
+
+	// 检查所有输入文件是否存在
+	for _, file := range inputFiles {
+		fullPath := filepath.Join("video", file)
+		if _, err := os.Stat(fullPath); os.IsNotExist(err) {
+			return fmt.Errorf("输入文件不存在: %s", fullPath)
+		}
+	}
+
+	// 创建临时文件列表用于concat
+	listFile := filepath.Join("video", "file_list.txt")
+	file, err := os.Create(listFile)
+	if err != nil {
+		return fmt.Errorf("无法创建文件列表: %v", err)
+	}
+	defer os.Remove(listFile)
+
+	for _, input := range inputFiles {
+		fmt.Fprintf(file, "file '%s'\n", input)
+	}
+	file.Close()
+
+	// 使用ffmpeg合并视频
+	// 构建命令: ffmpeg -f concat -safe 0 -i file_list.txt -vf scale=width:height -r fps outPath
+	cmd := exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", "file_list.txt",
+		"-vf", fmt.Sprintf("scale=%d:%d", width, height),
+		"-r", fmt.Sprintf("%d", fps),
+		filepath.Join("..", outPath), "-y")
+
+	// 设置工作目录为video目录
+	cmd.Dir = "video"
+
+	// 执行命令
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ffmpeg执行失败: %v, 输出: %s", err, string(output))
+	}
+
+	// 检查输出文件是否存在
+	if _, err := os.Stat(outPath); os.IsNotExist(err) {
+		return fmt.Errorf("输出文件未生成")
+	}
+
+	return nil
 }
