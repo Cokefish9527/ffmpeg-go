@@ -11,3 +11,9 @@ require (
 	github.com/u2takey/go-utils v0.3.1
 	gocv.io/x/gocv v0.25.0
 )
+
+require (
+	github.com/swaggo/files v1.0.1
+	github.com/swaggo/gin-swagger v1.6.0
+	github.com/swaggo/swag v1.16.1
+)

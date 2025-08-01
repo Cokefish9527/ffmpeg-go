@@ -1,0 +1,169 @@
+swagger: '2.0'
+info:
+  title: ffmpeg-go API
+  description: 基于FFmpeg的视频编辑服务API
+  version: 1.0.0
+host: localhost:8080
+schemes:
+  - http
+basePath: /api/v1
+produces:
+  - application/json
+consumes:
+  - application/json
+
+paths:
+  /video/edit:
+    post:
+      summary: 提交视频编辑任务
+      description: 提交一个新的视频编辑任务到处理队列
+      tags:
+        - video
+      parameters:
+        - in: body
+          name: request
+          description: 视频编辑请求
+          required: true
+          schema:
+            $ref: '#/definitions/VideoEditRequest'
+      responses:
+        '202':
+          description: 任务已接受
+          schema:
+            $ref: '#/definitions/VideoEditResponse'
+        '400':
+          description: 请求格式错误
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+        '500':
+          description: 服务器内部错误
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+  /video/edit/{taskId}:
+    get:
+      summary: 获取视频编辑任务状态
+      description: 根据任务ID获取视频编辑任务的当前状态
+      tags:
+        - video
+      parameters:
+        - in: path
+          name: taskId
+          description: 任务ID
+          required: true
+          type: string
+      responses:
+        '200':
+          description: 任务状态信息
+          schema:
+            $ref: '#/definitions/TaskStatusResponse'
+        '404':
+          description: 任务未找到
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+        '500':
+          description: 服务器内部错误
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    delete:
+      summary: 取消视频编辑任务
+      description: 根据任务ID取消视频编辑任务
+      tags:
+        - video
+      parameters:
+        - in: path
+          name: taskId
+          description: 任务ID
+          required: true
+          type: string
+      responses:
+        '200':
+          description: 任务取消成功
+          schema:
+            type: object
+            properties:
+              message:
+                type: string
+              taskId:
+                type: string
+        '500':
+          description: 服务器内部错误
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+              taskId:
+                type: string
+
+definitions:
+  VideoEditRequest:
+    type: object
+    properties:
+      spec:
+        type: object
+        description: 视频编辑规范
+      outputPath:
+        type: string
+        description: 本地输出路径
+      ossOutput:
+        $ref: '#/definitions/OSSOutput'
+
+  OSSOutput:
+    type: object
+    properties:
+      bucket:
+        type: string
+      key:
+        type: string
+      endpoint:
+        type: string
+      accessKey:
+        type: string
+      secretKey:
+        type: string
+
+  VideoEditResponse:
+    type: object
+    properties:
+      taskId:
+        type: string
+      status:
+        type: string
+      message:
+        type: string
+      outputUrl:
+        type: string
+
+  TaskStatusResponse:
+    type: object
+    properties:
+      taskId:
+        type: string
+      status:
+        type: string
+      progress:
+        type: number
+        format: double
+      message:
+        type: string
+      created:
+        type: string
+      started:
+        type: string
+      finished:
+        type: string
+      outputUrl:
+        type: string
