@@ -165,18 +165,23 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "accessKey": {
+                    "description": "AccessKey 阿里云访问密钥ID",
                     "type": "string"
                 },
                 "bucket": {
+                    "description": "Bucket OSS存储桶名称",
                     "type": "string"
                 },
                 "endpoint": {
+                    "description": "Endpoint OSS服务终端节点",
                     "type": "string"
                 },
                 "key": {
+                    "description": "Key OSS对象键名，即文件在OSS中的路径",
                     "type": "string"
                 },
                 "secretKey": {
+                    "description": "SecretKey 阿里云访问密钥Secret",
                     "type": "string"
                 }
             }
@@ -185,27 +190,35 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "created": {
+                    "description": "Created 任务创建时间，RFC3339格式",
                     "type": "string"
                 },
                 "finished": {
+                    "description": "Finished 任务完成时间，RFC3339格式",
                     "type": "string"
                 },
                 "message": {
+                    "description": "Message 任务相关的消息或错误信息",
                     "type": "string"
                 },
                 "outputUrl": {
+                    "description": "OutputURL 输出文件的URL地址",
                     "type": "string"
                 },
                 "progress": {
+                    "description": "Progress 任务进度百分比，范围0-1",
                     "type": "number"
                 },
                 "started": {
+                    "description": "Started 任务开始处理时间，RFC3339格式",
                     "type": "string"
                 },
                 "status": {
+                    "description": "Status 任务当前状态，如\"pending\"、\"processing\"、\"completed\"、\"failed\"",
                     "type": "string"
                 },
                 "taskId": {
+                    "description": "TaskID 任务ID",
                     "type": "string"
                 }
             }
@@ -214,7 +227,7 @@ const docTemplate = `{
             "type": "object",
             "properties": {
                 "ossOutput": {
-                    "description": "OSS 输出配置",
+                    "description": "OSSOutput 阿里云OSS输出配置，用于将输出文件上传到OSS",
                     "allOf": [
                         {
                             "$ref": "#/definitions/api.OSSOutput"
@@ -222,25 +235,31 @@ const docTemplate = `{
                     ]
                 },
                 "outputPath": {
-                    "description": "本地输出路径",
+                    "description": "OutputPath 本地输出路径，指定视频文件保存的本地路径",
                     "type": "string"
                 },
-                "spec": {}
+                "spec": {
+                    "description": "Spec 视频编辑规范，包含具体的编辑参数和配置"
+                }
             }
         },
         "api.VideoEditResponse": {
             "type": "object",
             "properties": {
                 "message": {
+                    "description": "Message 响应消息，提供额外的信息说明",
                     "type": "string"
                 },
                 "outputUrl": {
+                    "description": "OutputURL 输出文件的URL地址（如果已上传到OSS）",
                     "type": "string"
                 },
                 "status": {
+                    "description": "Status 任务状态，如\"accepted\"表示已接受",
                     "type": "string"
                 },
                 "taskId": {
+                    "description": "TaskID 任务ID，用于标识和查询任务状态",
                     "type": "string"
                 }
             }
