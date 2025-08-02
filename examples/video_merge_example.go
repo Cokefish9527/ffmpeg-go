@@ -8,16 +8,23 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"time"
 
-	"github.com/google/uuid"
+	// "github.com/google/uuid"
 )
 
-// VideoEditSpec 已移除，使用interface{}代替
-
-// OutputSpec 输出规范
-type OutputSpec struct {
-	Filename string `json:"filename"`
+// VideoInfo 视频信息
+type VideoInfo struct {
+	FileName   string  `json:"fileName"`
+	FileSize   int64   `json:"fileSize"`
+	Duration   float64 `json:"duration"`
+	Codec      string `json:"codec"`
+	Width      int     `json:"width"`
+	Height     int     `json:"height"`
+	FPS        float64 `json:"fps"`
+	Bitrate    int     `json:"bitrate"`
 }
 
 // VideoEditRequest 视频编辑请求
@@ -73,6 +80,7 @@ type VideoMergeTest struct {
 	logFile    *os.File
 	httpClient *http.Client
 	logs       []APILog
+	startTime  time.Time
 }
 
 // NewVideoMergeTest 创建新的视频合并测试实例
@@ -135,6 +143,21 @@ func (vmt *VideoMergeTest) healthCheck() error {
 
 	fmt.Println("Health check passed")
 	return nil
+}
+
+// createVideoMergeSpec 创建视频合并规范
+func (vmt *VideoMergeTest) createVideoMergeSpec() map[string]interface{} {
+	// 构造符合worker期望的视频编辑规范
+	// 生成简单的随机字符串替代UUID
+	randomStr := fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
+	spec := map[string]interface{}{
+		"outPath": fmt.Sprintf("./video/merged_output_%s.mp4", randomStr[:8]),
+		"width":   1280,
+		"height":  720,
+		"fps":     30,
+	}
+
+	return spec
 }
 
 // submitVideoEdit 提交视频编辑任务
@@ -201,6 +224,8 @@ func (vmt *VideoMergeTest) waitForTaskCompletion(taskID string) (*TaskStatusResp
 	ticker := time.NewTicker(2 * time.Second)
 	defer ticker.Stop()
 
+	// 显示处理进度
+	lastProgress := -1.0
 	for {
 		select {
 		case <-ctx.Done():
@@ -211,7 +236,11 @@ func (vmt *VideoMergeTest) waitForTaskCompletion(taskID string) (*TaskStatusResp
 				return nil, fmt.Errorf("failed to get task status: %w", err)
 			}
 
-			fmt.Printf("Task status: %s, Progress: %.2f%%\n", status.Status, status.Progress*100)
+			// 只有当进度发生变化时才打印
+			if status.Progress != lastProgress {
+				fmt.Printf("Task status: %s, Progress: %.2f%%\n", status.Status, status.Progress*100)
+				lastProgress = status.Progress
+			}
 
 			switch status.Status {
 			case "completed":
@@ -249,67 +278,182 @@ func (vmt *VideoMergeTest) cancelTask(taskID string) error {
 	return nil
 }
 
-// createVideoMergeSpec 创建视频合并规范
-func (vmt *VideoMergeTest) createVideoMergeSpec() map[string]interface{} {
-	// 构造符合worker期望的视频编辑规范
-	spec := map[string]interface{}{
-		"outPath": fmt.Sprintf("./video/merged_output_%s.mp4", uuid.New().String()[:8]),
-		"width":   1280,
-		"height":  720,
-		"fps":     30,
+// getVideoInfo 获取视频文件信息
+func (vmt *VideoMergeTest) getVideoInfo(filePath string) (*VideoInfo, error) {
+	// 检查文件是否存在
+	fileInfo, err := os.Stat(filePath)
+	if err != nil {
+		return nil, fmt.Errorf("无法获取文件信息: %w", err)
 	}
 
-	return spec
+	// 使用ffprobe获取视频信息
+	cmd := exec.Command("ffprobe", "-v", "quiet", "-print_format", "json", "-show_format", "-show_streams", filePath)
+	output, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("ffprobe执行失败: %w", err)
+	}
+
+	// 解析JSON输出
+	var probeData map[string]interface{}
+	if err := json.Unmarshal(output, &probeData); err != nil {
+		return nil, fmt.Errorf("解析ffprobe输出失败: %w", err)
+	}
+
+	// 提取视频信息
+	videoInfo := &VideoInfo{
+		FileName: filePath,
+		FileSize: fileInfo.Size(),
+	}
+
+	// 获取时长
+	if format, ok := probeData["format"].(map[string]interface{}); ok {
+		if durationStr, ok := format["duration"].(string); ok {
+			fmt.Sscanf(durationStr, "%f", &videoInfo.Duration)
+		}
+
+		if bitRateStr, ok := format["bit_rate"].(string); ok {
+			fmt.Sscanf(bitRateStr, "%d", &videoInfo.Bitrate)
+		}
+	}
+
+	// 获取视频流信息
+	if streams, ok := probeData["streams"].([]interface{}); ok {
+		for _, stream := range streams {
+			if streamMap, ok := stream.(map[string]interface{}); ok {
+				if codecType, ok := streamMap["codec_type"].(string); ok && codecType == "video" {
+					// 获取编码
+					if codecName, ok := streamMap["codec_name"].(string); ok {
+						videoInfo.Codec = codecName
+					}
+
+					// 获取尺寸
+					if width, ok := streamMap["width"].(float64); ok {
+						videoInfo.Width = int(width)
+					}
+					if height, ok := streamMap["height"].(float64); ok {
+						videoInfo.Height = int(height)
+					}
+
+					// 获取FPS
+					if avgFrameRate, ok := streamMap["avg_frame_rate"].(string); ok {
+						var num, den int
+						if _, err := fmt.Sscanf(avgFrameRate, "%d/%d", &num, &den); err == nil && den != 0 {
+							videoInfo.FPS = float64(num) / float64(den)
+						}
+					}
+					break
+				}
+			}
+		}
+	}
+
+	return videoInfo, nil
+}
+
+// printVideoInfo 打印视频信息
+func (vmt *VideoMergeTest) printVideoInfo(info *VideoInfo, label string) {
+	fmt.Printf("\n%s:\n", label)
+	fmt.Printf("  文件名: %s\n", info.FileName)
+	fmt.Printf("  文件大小: %.2f MB\n", float64(info.FileSize)/(1024*1024))
+	fmt.Printf("  时长: %.2f 秒\n", info.Duration)
+	fmt.Printf("  编码: %s\n", info.Codec)
+	fmt.Printf("  分辨率: %dx%d\n", info.Width, info.Height)
+	fmt.Printf("  FPS: %.2f\n", info.FPS)
+	fmt.Printf("  比特率: %d kbps\n", info.Bitrate/1000)
+}
+
+// printMaterialInfo 打印素材视频信息
+func (vmt *VideoMergeTest) printMaterialInfo() error {
+	fmt.Println("\n=== 素材视频信息 ===")
+
+	materials := []string{"1.mp4", "2.mp4", "3.mp4", "4.mp4"}
+	for _, material := range materials {
+		filePath := filepath.Join("video", material)
+		info, err := vmt.getVideoInfo(filePath)
+		if err != nil {
+			fmt.Printf("获取 %s 信息失败: %v\n", material, err)
+			continue
+		}
+		vmt.printVideoInfo(info, fmt.Sprintf("素材视频 %s", material))
+	}
+
+	return nil
 }
 
 // RunVideoMergeTest 运行视频合并测试
 func (vmt *VideoMergeTest) RunVideoMergeTest() error {
 	defer vmt.logFile.Close()
 
-	fmt.Println("Starting video merge test...")
+	// 记录开始时间
+	vmt.startTime = time.Now()
+	fmt.Printf("开始视频合并测试，时间: %s\n", vmt.startTime.Format("2006-01-02 15:04:05"))
 
-	// 1. 健康检查
+	// 1. 打印素材视频信息
+	if err := vmt.printMaterialInfo(); err != nil {
+		return fmt.Errorf("打印素材信息失败: %w", err)
+	}
+
+	// 2. 健康检查
 	if err := vmt.healthCheck(); err != nil {
 		return fmt.Errorf("health check failed: %w", err)
 	}
 
-	// 2. 创建视频合并规范
+	// 3. 创建视频合并规范
 	spec := vmt.createVideoMergeSpec()
-	
-	// 3. 提交视频编辑任务
+
+	// 4. 提交视频编辑任务
 	request := VideoEditRequest{
 		Spec: spec,
 	}
-	
+
 	response, err := vmt.submitVideoEdit(request)
 	if err != nil {
 		return fmt.Errorf("failed to submit video edit task: %w", err)
 	}
 
-	// 4. 等待任务完成
+	// 5. 等待任务完成
 	finalStatus, err := vmt.waitForTaskCompletion(response.TaskID)
 	if err != nil {
 		return fmt.Errorf("task did not complete successfully: %w", err)
 	}
 
-	// 5. 输出结果信息
-	fmt.Printf("Video merge completed!\n")
-	fmt.Printf("Output file: %s\n", finalStatus.OutputURL)
-	fmt.Printf("Log file: %s\n", vmt.logFile.Name())
+	// 6. 输出结果信息和耗时
+	endTime := time.Now()
+	duration := endTime.Sub(vmt.startTime)
+	fmt.Printf("\n=== 合成完成 ===\n")
+	fmt.Printf("开始时间: %s\n", vmt.startTime.Format("2006-01-02 15:04:05"))
+	fmt.Printf("结束时间: %s\n", endTime.Format("2006-01-02 15:04:05"))
+	fmt.Printf("总耗时: %v\n", duration.Truncate(time.Millisecond))
 
-	// 6. 验证输出文件是否存在
+	// 7. 打印输出视频信息
 	if finalStatus.OutputURL != "" {
-		if _, err := os.Stat(finalStatus.OutputURL); err == nil {
-			fmt.Printf("Output file exists and is accessible\n")
+		info, err := vmt.getVideoInfo(finalStatus.OutputURL)
+		if err != nil {
+			fmt.Printf("获取输出视频信息失败: %v\n", err)
 		} else {
-			fmt.Printf("Warning: Output file not found or not accessible: %v\n", err)
+			vmt.printVideoInfo(info, "合成视频")
 		}
 	}
 
+	// 8. 验证输出文件是否存在
+	if finalStatus.OutputURL != "" {
+		if _, err := os.Stat(finalStatus.OutputURL); err == nil {
+			fmt.Printf("\n输出文件存在且可访问\n")
+		} else {
+			fmt.Printf("\n警告: 输出文件未找到或不可访问: %v\n", err)
+		}
+	}
+
+	fmt.Printf("\n日志文件: %s\n", vmt.logFile.Name())
 	return nil
 }
 
 func main() {
+	Run()
+}
+
+// Run 运行视频合并测试的主函数
+func Run() {
 	// 创建测试实例
 	test, err := NewVideoMergeTest("http://localhost:8082")
 	if err != nil {
@@ -321,6 +465,6 @@ func main() {
 	if err := test.RunVideoMergeTest(); err != nil {
 		fmt.Printf("Test failed: %v\n", err)
 	} else {
-		fmt.Println("Test completed successfully")
+		fmt.Println("\n=== 测试完成 ===")
 	}
 }

@@ -220,22 +220,18 @@ func (w *Worker) mergeVideos(outPath string, width, height, fps int) error {
 	}
 	file.Close()
 
-	// 使用ffmpeg合并视频
-	// 构建命令: ffmpeg -f concat -safe 0 -i file_list.txt -c copy outPath
-	cmd := exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile, "-c", "copy", outPath, "-y")
+	// 使用ffmpeg合并视频，强制重新编码以确保兼容性
+	// 构建命令: ffmpeg -f concat -safe 0 -i file_list.txt -vf scale=width:height,fps=fps -c:v libx264 -crf 23 -preset medium -c:a aac -b:a 128k outPath
+	cmd := exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
+		"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
+		"-c:v", "libx264", "-crf", "23", "-preset", "medium",
+		"-c:a", "aac", "-b:a", "128k",
+		outPath, "-y")
 
 	// 执行命令
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		// 如果-copy方式失败，尝试重新编码方式
-		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
-			"-vf", fmt.Sprintf("scale=%d:%d", width, height),
-			"-r", fmt.Sprintf("%d", fps),
-			outPath, "-y")
-		output, err = cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("ffmpeg执行失败: %v, 输出: %s", err, string(output))
-		}
+		return fmt.Errorf("ffmpeg执行失败: %v, 输出: %s", err, string(output))
 	}
 
 	// 检查输出文件是否存在

@@ -254,11 +254,11 @@ func (vmt *VideoMergeTest) createVideoMergeSpec() map[string]interface{} {
 	// 构造视频合并规范，这里我们构造一个简单的规范
 	spec := map[string]interface{}{
 		"inputs": []map[string]interface{}{
-			{"source": "./video/1.mp4"},
-			{"source": "./video/2.mp4"},
-			{"source": "./video/3.mp4"},
-			{"source": "./video/4.mp4"},
-			{"source": "./video/5.mp4"},
+			{"source": "./video/1.ts"},
+			{"source": "./video/2.ts"},
+			{"source": "./video/3.ts"},
+			{"source": "./video/4.ts"},
+			{"source": "./video/5.ts"},
 		},
 		"output": map[string]interface{}{
 			"filename": fmt.Sprintf("./video/merged_output_%s.mp4", uuid.New().String()[:8]),
