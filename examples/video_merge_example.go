@@ -85,9 +85,16 @@ type VideoMergeTest struct {
 
 // NewVideoMergeTest 创建新的视频合并测试实例
 func NewVideoMergeTest(baseURL string, inputFiles []string) (*VideoMergeTest, error) {
+	// 确保log目录存在
+	logDir := "log"
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return nil, fmt.Errorf("failed to create log directory: %w", err)
+	}
+
 	// 创建日志文件
 	logFileName := fmt.Sprintf("video_merge_test_%s.log", time.Now().Format("20060102_150405"))
-	logFile, err := os.Create(logFileName)
+	logFilePath := filepath.Join(logDir, logFileName)
+	logFile, err := os.Create(logFilePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create log file: %w", err)
 	}
@@ -391,7 +398,7 @@ func (vmt *VideoMergeTest) printMaterialInfo() error {
 // RunVideoMergeTest 运行视频合并测试
 func (vmt *VideoMergeTest) RunVideoMergeTest() error {
 	defer vmt.logFile.Close()
-
+	
 	// 记录开始时间
 	vmt.startTime = time.Now()
 	fmt.Printf("开始视频合并测试，时间: %s\n", vmt.startTime.Format("2006-01-02 15:04:05"))
@@ -408,12 +415,12 @@ func (vmt *VideoMergeTest) RunVideoMergeTest() error {
 
 	// 3. 创建视频合并规范
 	spec := vmt.createVideoMergeSpec()
-
+	
 	// 4. 提交视频编辑任务
 	request := VideoEditRequest{
 		Spec: spec,
 	}
-
+	
 	response, err := vmt.submitVideoEdit(request)
 	if err != nil {
 		return fmt.Errorf("failed to submit video edit task: %w", err)
@@ -452,7 +459,9 @@ func (vmt *VideoMergeTest) RunVideoMergeTest() error {
 		}
 	}
 
-	fmt.Printf("\n日志文件: %s\n", vmt.logFile.Name())
+	// 打印日志文件路径
+	logFilePath, _ := filepath.Abs(vmt.logFile.Name())
+	fmt.Printf("\n日志文件: %s\n", logFilePath)
 	return nil
 }
 
