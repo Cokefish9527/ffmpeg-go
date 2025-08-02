@@ -160,6 +160,28 @@ func (w *Worker) processTask(task *Task) {
 		}
 	}
 
+	// 获取输入文件列表（如果存在）
+	var inputFiles []string
+	if inputVal, exists := spec["inputs"]; exists {
+		if inputs, ok := inputVal.([]interface{}); ok {
+			for _, input := range inputs {
+				if inputStr, ok := input.(string); ok {
+					inputFiles = append(inputFiles, inputStr)
+				}
+			}
+		}
+	}
+	
+	// 如果没有提供输入文件列表，则使用默认列表
+	if len(inputFiles) == 0 {
+		inputFiles = []string{
+			"1.mp4",
+			"2.mp4",
+			"3.mp4",
+			"4.mp4",
+		}
+	}
+
 	// 模拟视频编辑处理
 	// 实际项目中应该调用ffmpeg-go库进行视频编辑
 	// 这里我们模拟实际的视频处理操作
@@ -167,7 +189,7 @@ func (w *Worker) processTask(task *Task) {
 
 	// 实际执行视频合并操作
 	if outPath != "" && width > 0 && height > 0 {
-		err := w.mergeVideos(outPath, width, height, fps)
+		err := w.mergeVideos(inputFiles, outPath, width, height, fps)
 		if err != nil {
 			task.Status = "failed"
 			task.Error = fmt.Sprintf("视频合并失败: %v", err)
@@ -184,7 +206,7 @@ func (w *Worker) processTask(task *Task) {
 }
 
 // mergeVideos 合并视频文件
-func (w *Worker) mergeVideos(outPath string, width, height, fps int) error {
+func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height, fps int) error {
 	// 获取当前工作目录
 	wd, err := os.Getwd()
 	if err != nil {
@@ -192,15 +214,14 @@ func (w *Worker) mergeVideos(outPath string, width, height, fps int) error {
 	}
 
 	// 创建输入文件列表（使用绝对路径）
-	inputFiles := []string{
-		filepath.Join(wd, "video", "1.mp4"),
-		filepath.Join(wd, "video", "2.mp4"),
-		filepath.Join(wd, "video", "3.mp4"),
-		filepath.Join(wd, "video", "4.mp4"),
+	var fullInputFiles []string
+	for _, file := range inputFiles {
+		fullPath := filepath.Join(wd, "video", file)
+		fullInputFiles = append(fullInputFiles, fullPath)
 	}
 
 	// 检查所有输入文件是否存在
-	for _, file := range inputFiles {
+	for _, file := range fullInputFiles {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
 			return fmt.Errorf("输入文件不存在: %s", file)
 		}
@@ -214,7 +235,7 @@ func (w *Worker) mergeVideos(outPath string, width, height, fps int) error {
 	}
 	defer os.Remove(listFile)
 
-	for _, input := range inputFiles {
+	for _, input := range fullInputFiles {
 		// 在列表文件中使用双反斜杠转义路径
 		fmt.Fprintf(file, "file '%s'\n", strings.ReplaceAll(input, "\\", "/"))
 	}

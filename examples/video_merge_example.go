@@ -11,20 +11,19 @@ import (
 	"os/exec"
 	"path/filepath"
 	"time"
-
 	// "github.com/google/uuid"
 )
 
 // VideoInfo 视频信息
 type VideoInfo struct {
-	FileName   string  `json:"fileName"`
-	FileSize   int64   `json:"fileSize"`
-	Duration   float64 `json:"duration"`
-	Codec      string `json:"codec"`
-	Width      int     `json:"width"`
-	Height     int     `json:"height"`
-	FPS        float64 `json:"fps"`
-	Bitrate    int     `json:"bitrate"`
+	FileName string  `json:"fileName"`
+	FileSize int64   `json:"fileSize"`
+	Duration float64 `json:"duration"`
+	Codec    string  `json:"codec"`
+	Width    int     `json:"width"`
+	Height   int     `json:"height"`
+	FPS      float64 `json:"fps"`
+	Bitrate  int     `json:"bitrate"`
 }
 
 // VideoEditRequest 视频编辑请求
@@ -65,13 +64,13 @@ type TaskStatusResponse struct {
 
 // APILog API调用日志
 type APILog struct {
-	Timestamp   time.Time   `json:"timestamp"`
-	Method      string      `json:"method"`
-	URL         string      `json:"url"`
-	Request     interface{} `json:"request,omitempty"`
-	Response    interface{} `json:"response,omitempty"`
-	StatusCode  int         `json:"statusCode,omitempty"`
-	Error       string      `json:"error,omitempty"`
+	Timestamp  time.Time   `json:"timestamp"`
+	Method     string      `json:"method"`
+	URL        string      `json:"url"`
+	Request    interface{} `json:"request,omitempty"`
+	Response   interface{} `json:"response,omitempty"`
+	StatusCode int         `json:"statusCode,omitempty"`
+	Error      string      `json:"error,omitempty"`
 }
 
 // VideoMergeTest 视频合并测试结构
@@ -81,10 +80,11 @@ type VideoMergeTest struct {
 	httpClient *http.Client
 	logs       []APILog
 	startTime  time.Time
+	inputFiles []string // 添加输入文件列表字段
 }
 
 // NewVideoMergeTest 创建新的视频合并测试实例
-func NewVideoMergeTest(baseURL string) (*VideoMergeTest, error) {
+func NewVideoMergeTest(baseURL string, inputFiles []string) (*VideoMergeTest, error) {
 	// 创建日志文件
 	logFileName := fmt.Sprintf("video_merge_test_%s.log", time.Now().Format("20060102_150405"))
 	logFile, err := os.Create(logFileName)
@@ -92,11 +92,18 @@ func NewVideoMergeTest(baseURL string) (*VideoMergeTest, error) {
 		return nil, fmt.Errorf("failed to create log file: %w", err)
 	}
 
+	// 如果没有提供输入文件列表，则使用默认列表
+	if len(inputFiles) == 0 {
+		inputFiles = []string{"1.mp4", "2.mp4", "3.mp4", "4.mp4"}
+	}
+
 	return &VideoMergeTest{
 		baseURL:    baseURL,
 		logFile:    logFile,
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		logs:       make([]APILog, 0),
+		startTime:  time.Now(),
+		inputFiles: inputFiles, // 设置输入文件列表
 	}, nil
 }
 
@@ -151,6 +158,7 @@ func (vmt *VideoMergeTest) createVideoMergeSpec() map[string]interface{} {
 	// 生成简单的随机字符串替代UUID
 	randomStr := fmt.Sprintf("%08x", time.Now().UnixNano()&0xFFFFFFFF)
 	spec := map[string]interface{}{
+		"inputs":  vmt.inputFiles, // 传递输入文件列表
 		"outPath": fmt.Sprintf("./video/merged_output_%s.mp4", randomStr[:8]),
 		"width":   1280,
 		"height":  720,
@@ -366,8 +374,8 @@ func (vmt *VideoMergeTest) printVideoInfo(info *VideoInfo, label string) {
 func (vmt *VideoMergeTest) printMaterialInfo() error {
 	fmt.Println("\n=== 素材视频信息 ===")
 
-	materials := []string{"1.mp4", "2.mp4", "3.mp4", "4.mp4"}
-	for _, material := range materials {
+	// 使用配置的输入文件列表
+	for _, material := range vmt.inputFiles {
 		filePath := filepath.Join("video", material)
 		info, err := vmt.getVideoInfo(filePath)
 		if err != nil {
@@ -454,8 +462,10 @@ func main() {
 
 // Run 运行视频合并测试的主函数
 func Run() {
-	// 创建测试实例
-	test, err := NewVideoMergeTest("http://localhost:8082")
+	// 创建测试实例，可以在这里修改输入文件列表
+	inputFiles := []string{"1.ts", "2.ts", "3.ts", "4.ts", "5.ts"} // 修改这里的文件列表
+	// inputFiles := []string{"1.mp4", "2.mp4", "3.mp4", "4.mp4", "5.mp4"} // 修改这里的文件列表
+	test, err := NewVideoMergeTest("http://localhost:8082", inputFiles)
 	if err != nil {
 		fmt.Printf("Failed to create test instance: %v\n", err)
 		return
