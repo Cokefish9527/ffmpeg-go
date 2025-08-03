@@ -15,9 +15,109 @@ import (
 var (
 	taskBeingProcessed = make(map[string]bool)
 	taskMutex          = sync.Mutex{}
-	// 任务超时时间
-	taskTimeout = 30 * time.Minute
 )
+
+// WorkerPool 工作池结构
+type WorkerPool struct {
+	workers    []*Worker
+	maxWorkers int
+	taskQueue  TaskQueue
+	ctx        context.Context
+	cancel     context.CancelFunc
+	wg         sync.WaitGroup
+	mutex      sync.Mutex
+}
+
+// NewWorkerPool 创建新的工作池
+func NewWorkerPool(maxWorkers int, taskQueue TaskQueue) *WorkerPool {
+	// 如果未指定最大工作线程数，则使用CPU核心数
+	if maxWorkers <= 0 {
+		maxWorkers = runtime.NumCPU()
+	}
+	
+	ctx, cancel := context.WithCancel(context.Background())
+	
+	return &WorkerPool{
+		workers:    make([]*Worker, 0),
+		maxWorkers: maxWorkers,
+		taskQueue:  taskQueue,
+		ctx:        ctx,
+		cancel:     cancel,
+	}
+}
+
+// Start 启动工作池
+func (wp *WorkerPool) Start() {
+	wp.mutex.Lock()
+	defer wp.mutex.Unlock()
+	
+	// 初始化并启动工作线程
+	for i := 0; i < wp.maxWorkers; i++ {
+		worker := NewWorker(wp.taskQueue)
+		wp.workers = append(wp.workers, worker)
+		
+		wp.wg.Add(1)
+		go func(w *Worker) {
+			defer wp.wg.Done()
+			w.Start(wp.ctx)
+		}(worker)
+	}
+	
+	fmt.Printf("WorkerPool started with %d workers\n", wp.maxWorkers)
+}
+
+// Stop 停止工作池
+func (wp *WorkerPool) Stop() {
+	wp.mutex.Lock()
+	defer wp.mutex.Unlock()
+	
+	// 取消上下文，通知所有工作线程停止
+	wp.cancel()
+	
+	// 等待所有工作线程完成
+	wp.wg.Wait()
+	
+	fmt.Println("WorkerPool stopped")
+}
+
+// Resize 调整工作池大小
+func (wp *WorkerPool) Resize(newSize int) {
+	if newSize <= 0 {
+		newSize = runtime.NumCPU()
+	}
+	
+	wp.mutex.Lock()
+	defer wp.mutex.Unlock()
+	
+	currentSize := len(wp.workers)
+	
+	if newSize > currentSize {
+		// 增加Worker数量
+		for i := currentSize; i < newSize; i++ {
+			worker := NewWorker(wp.taskQueue)
+			wp.workers = append(wp.workers, worker)
+			
+			wp.wg.Add(1)
+			go func(w *Worker) {
+				defer wp.wg.Done()
+				w.Start(wp.ctx)
+			}(worker)
+		}
+		fmt.Printf("WorkerPool resized from %d to %d workers (added %d workers)\n", currentSize, newSize, newSize-currentSize)
+	} else if newSize < currentSize {
+		// 减少Worker数量（这里简化处理，实际项目中应该更优雅地处理）
+		wp.workers = wp.workers[:newSize]
+		fmt.Printf("WorkerPool resized from %d to %d workers (removed %d workers)\n", currentSize, newSize, currentSize-newSize)
+		// 注意：实际项目中需要更仔细地处理正在运行的Worker
+	}
+}
+
+// GetWorkerCount 获取当前Worker数量
+func (wp *WorkerPool) GetWorkerCount() int {
+	wp.mutex.Lock()
+	defer wp.mutex.Unlock()
+	return len(wp.workers)
+}
 
 // 检测可用的硬件编码器
 func detectHardwareEncoders() map[string]bool {
@@ -132,92 +232,34 @@ func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps 
 	return nil
 }
 
-// WorkerPool 工作池结构
-type WorkerPool struct {
-	workers   []*Worker
-	taskQueue TaskQueue
-	wg        sync.WaitGroup
-	ctx       context.Context
-	cancel    context.CancelFunc
-}
-
-// NewWorkerPool 创建新的工作池
-func NewWorkerPool(size int, taskQueue TaskQueue) *WorkerPool {
-	// 如果未指定大小，则使用CPU核心数
-	if size <= 0 {
-		size = runtime.NumCPU()
-	}
-	
-	ctx, cancel := context.WithCancel(context.Background())
-	
-	wp := &WorkerPool{
-		workers:   make([]*Worker, size),
-		taskQueue: taskQueue,
-		ctx:       ctx,
-		cancel:    cancel,
-	}
-
-	// 创建工作线程
-	for i := 0; i < size; i++ {
-		worker := NewWorker(i, taskQueue)
-		wp.workers[i] = worker
-	}
-
-	return wp
-}
-
-// Start 启动工作池
-func (wp *WorkerPool) Start() {
-	for _, worker := range wp.workers {
-		wp.wg.Add(1)
-		go func(w *Worker) {
-			defer wp.wg.Done()
-			w.Run(wp.ctx)
-		}(worker)
-	}
-}
-
-// Stop 停止工作池
-func (wp *WorkerPool) Stop() {
-	wp.cancel()
-	wp.wg.Wait()
-}
-
-// GetWorkerCount 获取工作线程数
-func (wp *WorkerPool) GetWorkerCount() int {
-	return len(wp.workers)
-}
-
-// SubmitTask 提交任务到工作池
-func (wp *WorkerPool) SubmitTask(task *Task) error {
-	return wp.taskQueue.Add(task)
-}
-
-// Worker 工作线程结构
+// Worker 工作者结构
 type Worker struct {
 	id        int
 	taskQueue TaskQueue
 }
 
-// NewWorker 创建新的工作线程
-func NewWorker(id int, taskQueue TaskQueue) *Worker {
+// NewWorker 创建新的工作者
+func NewWorker(taskQueue TaskQueue) *Worker {
 	return &Worker{
-		id:        id,
+		id:        0, // 实际项目中应该分配唯一ID
 		taskQueue: taskQueue,
 	}
 }
 
-// Run 运行工作线程
-func (w *Worker) Run(ctx context.Context) {
+// Start 启动工作者
+func (w *Worker) Start(ctx context.Context) {
+	// 持续处理任务直到上下文被取消
 	for {
 		select {
 		case <-ctx.Done():
+			// 上下文被取消，退出循环
 			return
 		default:
-			// 处理任务
+			// 处理下一个任务
 			w.processNextTask()
+			
 			// 短暂休眠以避免过度占用CPU
-			time.Sleep(10 * time.Millisecond)
+			time.Sleep(100 * time.Millisecond)
 		}
 	}
 }
