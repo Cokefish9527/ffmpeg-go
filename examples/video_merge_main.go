@@ -384,6 +384,7 @@ func (vmt *VideoMergeTest) createVideoMergeSpec() map[string]interface{} {
 		"width":   1280,
 		"height":  720,
 		"fps":     30,
+		"preset":  "ultrafast", // 使用最快的编码预设
 	}
 
 	return spec

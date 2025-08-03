@@ -19,6 +19,119 @@ var (
 	taskTimeout = 30 * time.Minute
 )
 
+// 检测可用的硬件编码器
+func detectHardwareEncoders() map[string]bool {
+	encoders := make(map[string]bool)
+	
+	// 检测NVIDIA NVENC
+	cmd := exec.Command("ffmpeg", "-h", "encoder=h264_nvenc")
+	if err := cmd.Run(); err == nil {
+		encoders["h264_nvenc"] = true
+	}
+	
+	// 检测Intel Quick Sync
+	cmd = exec.Command("ffmpeg", "-h", "encoder=h264_qsv")
+	if err := cmd.Run(); err == nil {
+		encoders["h264_qsv"] = true
+	}
+	
+	// 检测AMD VCE
+	cmd = exec.Command("ffmpeg", "-h", "encoder=h264_amf")
+	if err := cmd.Run(); err == nil {
+		encoders["h264_amf"] = true
+	}
+	
+	return encoders
+}
+
+// 选择最佳编码器
+func selectBestEncoder() string {
+	availableEncoders := detectHardwareEncoders()
+	
+	// 优先级顺序：NVENC > QSV > AMF > libx264
+	if availableEncoders["h264_nvenc"] {
+		return "h264_nvenc"
+	}
+	
+	if availableEncoders["h264_qsv"] {
+		return "h264_qsv"
+	}
+	
+	if availableEncoders["h264_amf"] {
+		return "h264_amf"
+	}
+	
+	// 默认使用libx264
+	return "libx264"
+}
+
+// 尝试使用指定编码器，如果失败则降级到libx264
+func tryEncoderWithFallback(encoder, listFile, outPath string, width, height, fps int, preset string) error {
+	// 首先尝试使用指定的编码器
+	err := runFFmpegWithEncoder(encoder, listFile, outPath, width, height, fps, preset)
+	if err == nil {
+		return nil // 成功则直接返回
+	}
+	
+	// 如果失败且不是libx264，则尝试降级到libx264
+	if encoder != "libx264" {
+		fmt.Printf("使用编码器 %s 失败，降级到 libx264: %v\n", encoder, err)
+		return runFFmpegWithEncoder("libx264", listFile, outPath, width, height, fps, preset)
+	}
+	
+	// 如果已经是libx264还失败，则返回错误
+	return err
+}
+
+// 使用指定编码器运行FFmpeg
+func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps int, preset string) error {
+	// 构建命令
+	var cmd *exec.Cmd
+	
+	// 根据编码器类型选择合适的预设
+	encoderPreset := preset
+	if encoder != "libx264" {
+		// 硬件编码器通常支持更少的预设选项
+		encoderPreset = "fast" // 大多数硬件编码器都支持fast预设
+	}
+	
+	// 对于不同编码器，使用不同的优化参数
+	switch encoder {
+	case "h264_nvenc":
+		// NVENC编码器不支持CRF模式，使用cq模式
+		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
+			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
+			"-c:v", encoder, "-cq", "28", "-preset", encoderPreset,
+			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
+			"-threads", "0", // 自动选择线程数
+			outPath, "-y")
+	case "libx264":
+		// libx264编码器使用CRF模式
+		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
+			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
+			"-c:v", encoder, "-crf", "28", "-preset", encoderPreset,
+			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
+			"-threads", "0", // 自动选择线程数
+			outPath, "-y")
+	default:
+		// 其他编码器使用通用参数
+		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
+			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
+			"-c:v", encoder, "-crf", "28", "-preset", encoderPreset,
+			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
+			"-threads", "0", // 自动选择线程数
+			outPath, "-y")
+	}
+	
+	// 执行命令
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("ffmpeg执行失败: %v, 输出: %s", err, string(output))
+	}
+	
+	return nil
+}
+
 // WorkerPool 工作池结构
 type WorkerPool struct {
 	workers   []*Worker
@@ -187,6 +300,14 @@ func (w *Worker) processTask(task *Task) {
 			fps = int(num)
 		}
 	}
+	
+	// 获取编码预设配置
+	encodingPreset := "medium"
+	if presetVal, exists := spec["preset"]; exists {
+		if str, ok := presetVal.(string); ok {
+			encodingPreset = str
+		}
+	}
 
 	// 获取输入文件列表（如果存在）
 	var inputFiles []string
@@ -211,7 +332,7 @@ func (w *Worker) processTask(task *Task) {
 	}
 
 	// 根据视频质量和目标质量选择合适的编码预设
-	preset := "medium" // 默认预设
+	preset := encodingPreset // 使用配置的预设
 	
 	// 如果目标分辨率较低，可以使用更快的编码
 	if width <= 640 && height <= 480 {
@@ -283,18 +404,13 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 	}
 	file.Close()
 
-	// 使用ffmpeg合并视频，根据preset选择合适的编码速度
-	// 构建命令: ffmpeg -f concat -safe 0 -i file_list.txt -vf scale=width:height,fps=fps -c:v libx264 -crf 23 -preset preset -c:a aac -b:a 128k outPath
-	cmd := exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
-		"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
-		"-c:v", "libx264", "-crf", "23", "-preset", preset,
-		"-c:a", "aac", "-b:a", "128k",
-		outPath, "-y")
-
-	// 执行命令
-	output, err := cmd.CombinedOutput()
+	// 选择最佳编码器
+	videoEncoder := selectBestEncoder()
+	
+	// 尝试使用选定的编码器，如果失败则降级
+	err = tryEncoderWithFallback(videoEncoder, listFile, outPath, width, height, fps, preset)
 	if err != nil {
-		return fmt.Errorf("ffmpeg执行失败: %v, 输出: %s", err, string(output))
+		return fmt.Errorf("视频编码失败: %v", err)
 	}
 
 	// 检查输出文件是否存在
