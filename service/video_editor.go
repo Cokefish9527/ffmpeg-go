@@ -1,22 +1,17 @@
 package service
 
 import (
+	"time"
+
 	"github.com/google/uuid"
+	"github.com/u2takey/ffmpeg-go/api"
 )
 
 // VideoEditor 视频编辑服务接口
 type VideoEditor interface {
-	// SubmitTask 提交视频编辑任务
-	SubmitTask(spec interface{}) (string, error)
-	
-	// GetTaskStatus 获取任务状态
+	SubmitTask(request *api.VideoEditRequest) (*Task, error)
 	GetTaskStatus(taskID string) (*Task, error)
-	
-	// CancelTask 取消任务
 	CancelTask(taskID string) error
-	
-	// ListTasks 列出所有任务
-	ListTasks() ([]*Task, error)
 }
 
 // VideoEditorService 视频编辑服务实现
@@ -32,25 +27,23 @@ func NewVideoEditorService(taskQueue TaskQueue) *VideoEditorService {
 }
 
 // SubmitTask 提交视频编辑任务
-func (s *VideoEditorService) SubmitTask(spec interface{}) (string, error) {
-	// 生成任务ID
-	taskID := uuid.New().String()
-	
-	// 创建任务对象
+func (s *VideoEditorService) SubmitTask(request *api.VideoEditRequest) (*Task, error) {
+	// 创建任务
 	task := &Task{
-		ID:       taskID,
-		Spec:     spec,
+		ID:       uuid.New().String(),
+		Spec:     request.Spec,
 		Status:   "pending",
+		Created:  time.Now(),
 		Progress: 0.0,
 	}
-	
-	// 将任务添加到任务队列
+
+	// 添加到任务队列
 	err := s.taskQueue.Add(task)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
-	
-	return taskID, nil
+
+	return task, nil
 }
 
 // GetTaskStatus 获取任务状态
@@ -66,19 +59,20 @@ func (s *VideoEditorService) CancelTask(taskID string) error {
 	if err != nil {
 		return err
 	}
-	
+
 	if task == nil {
-		return nil // 任务不存在，直接返回
+		return nil // 任务不存在，视为取消成功
 	}
-	
-	// 只有在任务未完成时才能取消
-	if task.Status == "pending" || task.Status == "processing" {
-		task.Status = "cancelled"
-		task.Error = "任务已被取消"
-		return s.taskQueue.Update(task)
+
+	// 如果任务已经在处理中或已完成，则不能取消
+	if task.Status == "processing" || task.Status == "completed" || task.Status == "failed" {
+		return nil
 	}
-	
-	return nil
+
+	// 更新任务状态为已取消
+	task.Status = "cancelled"
+	task.Finished = time.Now()
+	return s.taskQueue.Update(task)
 }
 
 // ListTasks 列出所有任务
