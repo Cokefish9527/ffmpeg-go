@@ -15,6 +15,7 @@ import (
 var (
 	taskBeingProcessed = make(map[string]bool)
 	taskMutex          = sync.Mutex{}
+	videoInfoCache     = NewVideoInfoCache() // 全局视频信息缓存
 )
 
 // WorkerPool 工作池结构
@@ -418,10 +419,16 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 		return fmt.Errorf("无法获取当前工作目录: %v", err)
 	}
 
+	// 预处理输入文件
+	processedFiles, err := videoInfoCache.PreprocessInputFiles(inputFiles, wd)
+	if err != nil {
+		return fmt.Errorf("预处理输入文件失败: %v", err)
+	}
+
 	// 创建输入文件列表（使用绝对路径）
 	var fullInputFiles []string
-	for _, file := range inputFiles {
-		fullPath := filepath.Join(wd, "video", file)
+	for _, file := range processedFiles {
+		fullPath := file
 		fullInputFiles = append(fullInputFiles, fullPath)
 	}
 
