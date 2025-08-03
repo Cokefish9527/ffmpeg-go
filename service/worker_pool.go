@@ -411,6 +411,68 @@ func (w *Worker) processTask(task *Task) {
 	taskMutex.Unlock()
 }
 
+// ParallelDecodeForTest 用于测试的并行解码方法
+func (w *Worker) ParallelDecodeForTest(inputFiles []string, workDir string) ([]string, error) {
+	return w.parallelDecode(inputFiles, workDir)
+}
+
+// parallelDecode 并行解码输入文件
+func (w *Worker) parallelDecode(inputFiles []string, workDir string) ([]string, error) {
+	// 创建临时目录用于存储解码后的文件
+	tempDir := filepath.Join(workDir, "temp", fmt.Sprintf("decode_%d", time.Now().UnixNano()))
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return nil, fmt.Errorf("创建临时目录失败: %v", err)
+	}
+	
+	// 使用WaitGroup等待所有解码任务完成
+	var wg sync.WaitGroup
+	decodedFiles := make([]string, len(inputFiles))
+	errors := make(chan error, len(inputFiles))
+	
+	// 并行解码所有输入文件
+	for i, file := range inputFiles {
+		wg.Add(1)
+		go func(index int, inputFile string) {
+			defer wg.Done()
+			
+			// 构造完整输入文件路径
+			fullInputPath := filepath.Join(workDir, "video", inputFile)
+			
+			// 构造输出文件路径
+			outputFile := fmt.Sprintf("decoded_%d.mp4", index)
+			fullOutputPath := filepath.Join(tempDir, outputFile)
+			decodedFiles[index] = fullOutputPath
+			
+			// 使用ffmpeg解码文件
+			// 这里我们直接转码为统一格式，以便后续处理
+			cmd := exec.Command("ffmpeg", "-i", fullInputPath,
+				"-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+				"-c:a", "aac", "-b:a", "96k",
+				"-threads", "0",
+				fullOutputPath, "-y")
+			
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				errors <- fmt.Errorf("解码文件 %s 失败: %v, 输出: %s", inputFile, err, string(output))
+				return
+			}
+		}(i, file)
+	}
+	
+	// 等待所有解码任务完成
+	wg.Wait()
+	close(errors)
+	
+	// 检查是否有错误
+	if len(errors) > 0 {
+		// 清理临时目录
+		os.RemoveAll(tempDir)
+		return nil, <-errors
+	}
+	
+	return decodedFiles, nil
+}
+
 // mergeVideos 合并视频文件
 func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height, fps int, preset string) error {
 	// 获取当前工作目录
@@ -419,15 +481,30 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 		return fmt.Errorf("无法获取当前工作目录: %v", err)
 	}
 
-	// 预处理输入文件
-	processedFiles, err := videoInfoCache.PreprocessInputFiles(inputFiles, wd)
+	// 预处理输入文件（分析视频信息，但不改变文件）
+	_, err = videoInfoCache.PreprocessInputFiles(inputFiles, wd)
 	if err != nil {
 		return fmt.Errorf("预处理输入文件失败: %v", err)
 	}
 
+	// 并行解码输入文件
+	decodedFiles, err := w.parallelDecode(inputFiles, wd)
+	if err != nil {
+		return fmt.Errorf("并行解码失败: %v", err)
+	}
+	
+	// 记得清理临时文件
+	defer func() {
+		// 获取临时目录路径并删除
+		if len(decodedFiles) > 0 {
+			tempDir := filepath.Dir(decodedFiles[0])
+			os.RemoveAll(tempDir)
+		}
+	}()
+
 	// 创建输入文件列表（使用绝对路径）
 	var fullInputFiles []string
-	for _, file := range processedFiles {
+	for _, file := range decodedFiles {
 		fullPath := file
 		fullInputFiles = append(fullInputFiles, fullPath)
 	}
