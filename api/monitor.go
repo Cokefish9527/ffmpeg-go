@@ -78,7 +78,17 @@ func (m *MonitorAPI) GetSystemStats(c *gin.Context) {
 		utils.Error("获取CPU使用率失败", map[string]string{"error": err.Error()})
 		cpuPercent = []float64{0}
 	}
-	
+
+	// 确保CPU使用率在合理范围内
+	var totalUsage float64
+	for _, usage := range cpuPercent {
+		totalUsage += usage
+	}
+	cpuCount := runtime.NumCPU()
+	if totalUsage > float64(cpuCount) * 100 {
+		totalUsage = float64(cpuCount) * 100
+	}
+
 	// 获取内存信息
 	memInfo, err := mem.VirtualMemory()
 	if err != nil {
@@ -102,7 +112,7 @@ func (m *MonitorAPI) GetSystemStats(c *gin.Context) {
 	
 	stats := &SystemStats{
 		Timestamp:     time.Now(),
-		CPUUsage:      cpuPercent[0],
+		CPUUsage:      totalUsage,
 		MemoryUsage:   memInfo.UsedPercent,
 		MemoryTotal:   memInfo.Total,
 		MemoryUsed:    memInfo.Used,
@@ -493,4 +503,43 @@ func (m *MonitorAPI) DiscardTask(c *gin.Context) {
 		"message": "Task discarded successfully",
 		"taskId":  req.TaskID,
 	})
+}
+
+// GetTaskExecutions 获取任务执行历史
+func (m *MonitorAPI) GetTaskExecutions(c *gin.Context) {
+	utils.Debug("收到任务执行历史请求", map[string]string{"clientIP": c.ClientIP()})
+
+	taskID := c.Param("taskId")
+	if taskID == "" {
+		utils.Warn("任务ID不能为空", nil)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Task ID is required",
+		})
+		return
+	}
+
+	// 获取任务执行历史
+	executions, err := m.taskQueue.GetTaskExecutions(taskID)
+	if err != nil {
+		utils.Error("获取任务执行历史失败", map[string]string{
+			"taskId": taskID,
+			"error":  err.Error(),
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get task executions",
+		})
+		return
+	}
+
+	if executions == nil {
+		utils.Warn("任务执行历史不存在", map[string]string{"taskId": taskID})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Task executions not found",
+		})
+		return
+	}
+
+	utils.Info("任务执行历史获取成功", map[string]string{"taskId": taskID})
+	c.JSON(http.StatusOK, executions)
+
 }

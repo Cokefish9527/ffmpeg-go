@@ -167,6 +167,20 @@ func (wp *WorkerPool) GetWorkerCount() int {
 	return len(wp.workers)
 }
 
+// GetActiveWorkerCount 获取活跃Worker数量
+func (wp *WorkerPool) GetActiveWorkerCount() int {
+	wp.mutex.Lock()
+	defer wp.mutex.Unlock()
+    
+    activeCount := 0
+    for _, worker := range wp.workers {
+        if worker.IsActive() { // 假设Worker结构体有一个IsActive方法来判断是否活跃
+            activeCount++
+        }
+    }
+    return activeCount
+}
+
 // 检测可用的硬件编码器
 func detectHardwareEncoders() map[string]bool {
 	utils.Debug("检测硬件编码器", nil)

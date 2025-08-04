@@ -127,6 +127,7 @@ func main() {
 		apiGroup.GET("/monitor/tasks/stats", monitorAPI.GetTaskStats)
 		apiGroup.GET("/monitor/tasks", monitorAPI.GetTasks)
 		apiGroup.GET("/monitor/tasks/:taskId", monitorAPI.GetTaskDetail)
+		apiGroup.GET("/monitor/tasks/:taskId/executions", monitorAPI.GetTaskExecutions) // 添加获取任务执行历史的接口
 		apiGroup.GET("/monitor/workers", monitorAPI.GetWorkerStats)
 		// 添加任务管理接口
 		apiGroup.POST("/monitor/tasks/retry", monitorAPI.RetryTask)

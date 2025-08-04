@@ -13,10 +13,11 @@ import (
 
 // PersistentTaskQueue 持久化任务队列实现
 type PersistentTaskQueue struct {
-	tasks     map[string]*Task
-	mutex     sync.RWMutex
-	dataFile  string
-	dataDir   string
+	tasks      map[string]*Task
+	executions map[string][]*TaskExecution // 任务执行历史记录
+	mutex      sync.RWMutex
+	dataFile   string
+	dataDir    string
 }
 
 // NewPersistentTaskQueue 创建新的持久化任务队列
@@ -27,9 +28,10 @@ func NewPersistentTaskQueue(dataDir string) (*PersistentTaskQueue, error) {
 	}
 
 	q := &PersistentTaskQueue{
-		tasks:    make(map[string]*Task),
-		dataDir:  dataDir,
-		dataFile: filepath.Join(dataDir, "tasks.json"),
+		tasks:      make(map[string]*Task),
+		executions: make(map[string][]*TaskExecution),
+		dataDir:    dataDir,
+		dataFile:   filepath.Join(dataDir, "tasks.json"),
 	}
 
 	// 尝试从文件加载现有任务
@@ -72,6 +74,10 @@ func (q *PersistentTaskQueue) loadTasks() error {
 	// 将任务加载到内存中
 	for _, task := range tasks {
 		q.tasks[task.ID] = task
+		// 初始化执行历史记录
+		if q.executions[task.ID] == nil {
+			q.executions[task.ID] = make([]*TaskExecution, 0)
+		}
 	}
 
 	fmt.Printf("Loaded %d tasks from file\n", len(tasks))
@@ -128,6 +134,25 @@ func (q *PersistentTaskQueue) Push(task *Task) error {
 	if task.ExecutionCount == 0 && task.LastExecution.IsZero() {
 		task.ExecutionCount = 1
 		task.LastExecution = time.Now()
+		// 创建第一条执行记录
+		execution := &TaskExecution{
+			ID:              uuid.New().String(),
+			TaskID:          task.ID,
+			Status:          task.Status,
+			Spec:            task.Spec,
+			Result:          task.Result,
+			Error:           task.Error,
+			Created:         task.Created,
+			Started:         task.Started,
+			Finished:        task.Finished,
+			Progress:        task.Progress,
+			Priority:        task.Priority,
+			ExecutionNumber: task.ExecutionCount,
+		}
+		if q.executions[task.ID] == nil {
+			q.executions[task.ID] = make([]*TaskExecution, 0)
+		}
+		q.executions[task.ID] = append(q.executions[task.ID], execution)
 	}
 
 	q.tasks[task.ID] = task
@@ -156,6 +181,26 @@ func (q *PersistentTaskQueue) Pop() (*Task, error) {
 				}
 				task.LastExecution = time.Now()
 				
+				// 创建执行记录
+				execution := &TaskExecution{
+					ID:              uuid.New().String(),
+					TaskID:          task.ID,
+					Status:          task.Status,
+					Spec:            task.Spec,
+					Result:          task.Result,
+					Error:           task.Error,
+					Created:         task.Created,
+					Started:         task.Started,
+					Finished:        task.Finished,
+					Progress:        task.Progress,
+					Priority:        task.Priority,
+					ExecutionNumber: task.ExecutionCount,
+				}
+				if q.executions[task.ID] == nil {
+					q.executions[task.ID] = make([]*TaskExecution, 0)
+				}
+				q.executions[task.ID] = append(q.executions[task.ID], execution)
+				
 				// 保存到文件
 				if err := q.saveTasks(); err != nil {
 					return nil, err
@@ -180,6 +225,26 @@ func (q *PersistentTaskQueue) Pop() (*Task, error) {
 			}
 			task.LastExecution = time.Now()
 			
+			// 创建执行记录
+			execution := &TaskExecution{
+				ID:              uuid.New().String(),
+				TaskID:          task.ID,
+				Status:          task.Status,
+				Spec:            task.Spec,
+				Result:          task.Result,
+				Error:           task.Error,
+				Created:         task.Created,
+				Started:         task.Started,
+				Finished:        task.Finished,
+				Progress:        task.Progress,
+				Priority:        task.Priority,
+				ExecutionNumber: task.ExecutionCount,
+			}
+			if q.executions[task.ID] == nil {
+				q.executions[task.ID] = make([]*TaskExecution, 0)
+			}
+			q.executions[task.ID] = append(q.executions[task.ID], execution)
+			
 			// 保存到文件
 			if err := q.saveTasks(); err != nil {
 				return nil, err
@@ -190,6 +255,22 @@ func (q *PersistentTaskQueue) Pop() (*Task, error) {
 	}
 
 	return nil, nil
+}
+
+// GetTaskExecutions 获取任务的所有执行历史
+func (q *PersistentTaskQueue) GetTaskExecutions(taskID string) ([]*TaskExecution, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	executions, exists := q.executions[taskID]
+	if !exists {
+		return nil, nil
+	}
+
+	// 返回执行历史的副本
+	result := make([]*TaskExecution, len(executions))
+	copy(result, executions)
+	return result, nil
 }
 
 // List 列出所有任务

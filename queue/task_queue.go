@@ -17,6 +17,22 @@ const (
 	PriorityCritical
 )
 
+// TaskExecution 任务执行历史记录
+type TaskExecution struct {
+	ID          string        `json:"id"`
+	TaskID      string        `json:"taskId"`
+	Status      string        `json:"status"`
+	Spec        interface{}   `json:"spec"`
+	Result      string        `json:"result"`
+	Error       string        `json:"error"`
+	Created     time.Time     `json:"created"`
+	Started     time.Time     `json:"started"`
+	Finished    time.Time     `json:"finished"`
+	Progress    float64       `json:"progress"`
+	Priority    TaskPriority  `json:"priority"`
+	ExecutionNumber int       `json:"executionNumber"` // 执行序号
+}
+
 // Task 任务结构
 type Task struct {
 	ID            string        `json:"id"`
@@ -40,18 +56,21 @@ type TaskQueue interface {
 	List() ([]*Task, error)
 	Get(id string) (*Task, error)
 	Update(task *Task) error
+	GetTaskExecutions(taskID string) ([]*TaskExecution, error) // 添加获取任务执行历史的方法
 }
 
 // InMemoryTaskQueue 内存任务队列实现
 type InMemoryTaskQueue struct {
-	tasks map[string]*Task
-	mutex sync.RWMutex
+	tasks      map[string]*Task
+	executions map[string][]*TaskExecution // 任务执行历史记录
+	mutex      sync.RWMutex
 }
 
 // NewInMemoryTaskQueue 创建新的内存任务队列
 func NewInMemoryTaskQueue() *InMemoryTaskQueue {
 	return &InMemoryTaskQueue{
-		tasks: make(map[string]*Task),
+		tasks:      make(map[string]*Task),
+		executions: make(map[string][]*TaskExecution),
 	}
 }
 
@@ -83,6 +102,25 @@ func (q *InMemoryTaskQueue) Push(task *Task) error {
 	if task.ExecutionCount == 0 && task.LastExecution.IsZero() {
 		task.ExecutionCount = 1
 		task.LastExecution = time.Now()
+		// 创建第一条执行记录
+		execution := &TaskExecution{
+			ID:              uuid.New().String(),
+			TaskID:          task.ID,
+			Status:          task.Status,
+			Spec:            task.Spec,
+			Result:          task.Result,
+			Error:           task.Error,
+			Created:         task.Created,
+			Started:         task.Started,
+			Finished:        task.Finished,
+			Progress:        task.Progress,
+			Priority:        task.Priority,
+			ExecutionNumber: task.ExecutionCount,
+		}
+		if q.executions[task.ID] == nil {
+			q.executions[task.ID] = make([]*TaskExecution, 0)
+		}
+		q.executions[task.ID] = append(q.executions[task.ID], execution)
 	}
 	
 	q.tasks[task.ID] = task
@@ -98,6 +136,37 @@ func (q *InMemoryTaskQueue) Pop() (*Task, error) {
 	for priority := PriorityCritical; priority >= PriorityLow; priority-- {
 		for _, task := range q.tasks {
 			if task.Status == "pending" && task.Priority == priority {
+				// 更新任务状态为处理中
+				task.Status = "processing"
+				task.Started = time.Now()
+				// 增加执行次数（除了第一次执行）
+				if task.ExecutionCount > 0 {
+					task.ExecutionCount++
+				} else {
+					task.ExecutionCount = 1
+				}
+				task.LastExecution = time.Now()
+				
+				// 创建执行记录
+				execution := &TaskExecution{
+					ID:              uuid.New().String(),
+					TaskID:          task.ID,
+					Status:          task.Status,
+					Spec:            task.Spec,
+					Result:          task.Result,
+					Error:           task.Error,
+					Created:         task.Created,
+					Started:         task.Started,
+					Finished:        task.Finished,
+					Progress:        task.Progress,
+					Priority:        task.Priority,
+					ExecutionNumber: task.ExecutionCount,
+				}
+				if q.executions[task.ID] == nil {
+					q.executions[task.ID] = make([]*TaskExecution, 0)
+				}
+				q.executions[task.ID] = append(q.executions[task.ID], execution)
+				
 				return task, nil
 			}
 		}
@@ -106,11 +175,58 @@ func (q *InMemoryTaskQueue) Pop() (*Task, error) {
 	// 如果没有找到按优先级的任务，返回任意pending任务
 	for _, task := range q.tasks {
 		if task.Status == "pending" {
+			// 更新任务状态为处理中
+			task.Status = "processing"
+			task.Started = time.Now()
+			// 增加执行次数（除了第一次执行）
+			if task.ExecutionCount > 0 {
+				task.ExecutionCount++
+			} else {
+				task.ExecutionCount = 1
+			}
+			task.LastExecution = time.Now()
+			
+			// 创建执行记录
+			execution := &TaskExecution{
+				ID:              uuid.New().String(),
+				TaskID:          task.ID,
+				Status:          task.Status,
+				Spec:            task.Spec,
+				Result:          task.Result,
+				Error:           task.Error,
+				Created:         task.Created,
+				Started:         task.Started,
+				Finished:        task.Finished,
+				Progress:        task.Progress,
+				Priority:        task.Priority,
+				ExecutionNumber: task.ExecutionCount,
+			}
+			if q.executions[task.ID] == nil {
+				q.executions[task.ID] = make([]*TaskExecution, 0)
+			}
+			q.executions[task.ID] = append(q.executions[task.ID], execution)
+			
 			return task, nil
 		}
 	}
 	
 	return nil, nil
+}
+
+// GetTaskExecutions 获取任务的所有执行历史
+func (q *InMemoryTaskQueue) GetTaskExecutions(taskID string) ([]*TaskExecution, error) {
+	q.mutex.RLock()
+	defer q.mutex.RUnlock()
+
+	executions, exists := q.executions[taskID]
+	if !exists {
+		return nil, nil
+	}
+
+	// 返回执行历史的副本
+	result := make([]*TaskExecution, len(executions))
+	copy(result, executions)
+	return result, nil
 }
 
 // List 列出所有任务
