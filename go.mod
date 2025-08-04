@@ -13,6 +13,7 @@ require (
 )
 
 require (
+	github.com/pkg/errors v0.9.1 // indirect
 	github.com/swaggo/files v1.0.1
 	github.com/swaggo/gin-swagger v1.6.0
 	github.com/swaggo/swag v1.16.1
