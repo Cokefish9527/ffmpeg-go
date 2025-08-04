@@ -1,0 +1,23 @@
+[
+  {
+    "id": "d955f82d-9bd2-467c-91bb-3cf292e74734",
+    "status": "failed",
+    "spec": {
+      "inputs": [
+        {
+          "source": "../examples/sample_data/in1.mp4"
+        }
+      ],
+      "output": {
+        "filename": "../examples/sample_data/output_test.mp4"
+      }
+    },
+    "result": "",
+    "error": "缺少必要的视频编辑参数",
+    "created": "2025-08-04T17:24:37.4774765+08:00",
+    "started": "2025-08-04T17:59:23.5569378+08:00",
+    "finished": "2025-08-04T17:59:23.5569378+08:00",
+    "progress": 0,
+    "priority": 1
+  }
+]

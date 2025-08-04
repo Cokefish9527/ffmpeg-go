@@ -44,9 +44,13 @@ func main() {
 	// 设置Gin运行模式
 	gin.SetMode(gin.ReleaseMode)
 	
-	// 初始化任务队列 (使用queue包中的实现)
-	taskQueue = queue.NewInMemoryTaskQueue()
-	utils.Info("任务队列初始化完成", nil)
+	// 初始化任务队列 (使用持久化任务队列)
+	taskQueue, err := queue.NewPersistentTaskQueue("./data")
+	if err != nil {
+		utils.Error("任务队列初始化失败", map[string]string{"error": err.Error()})
+		log.Fatal("Failed to initialize task queue:", err)
+	}
+	utils.Info("持久化任务队列初始化完成", nil)
 	
 	// 从环境变量获取最大工作线程数，默认为0（使用CPU核心数）
 	maxWorkers := 0

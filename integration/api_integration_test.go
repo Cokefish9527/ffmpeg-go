@@ -2,16 +2,17 @@ package integration
 
 import (
 	"bytes"
-	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+	"context"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	
 	"github.com/u2takey/ffmpeg-go/api"
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
@@ -22,8 +23,12 @@ func setupIntegrationTestServer() (*gin.Engine, queue.TaskQueue, *service.Worker
 	// 设置Gin为测试模式
 	gin.SetMode(gin.TestMode)
 
-	// 初始化任务队列
-	taskQueue := queue.NewInMemoryTaskQueue()
+	// 使用持久化任务队列
+	taskQueue, err := queue.NewPersistentTaskQueue("./test_data")
+	if err != nil {
+		// 在测试环境中，我们无法直接访问t变量，简单处理错误
+		panic(err)
+	}
 
 	// 初始化视频编辑服务
 	editorService := service.NewVideoEditorService(taskQueue)
@@ -139,6 +144,7 @@ func setupIntegrationTestServer() (*gin.Engine, queue.TaskQueue, *service.Worker
 		// 添加任务管理接口
 		apiRoutes.POST("/monitor/tasks/retry", monitorAPI.RetryTask)
 		apiRoutes.POST("/monitor/tasks/cancel", monitorAPI.CancelTask)
+		apiRoutes.POST("/monitor/tasks/discard", monitorAPI.DiscardTask) // 添加任务丢弃接口
 	}
 
 	// 启动工作池
@@ -149,12 +155,16 @@ func setupIntegrationTestServer() (*gin.Engine, queue.TaskQueue, *service.Worker
 
 // TestAPISuite 运行完整的API测试套件
 func TestAPISuite(t *testing.T) {
-	// 检查示例数据文件是否存在
-	if _, err := os.Stat("../examples/sample_data/in1.mp4"); os.IsNotExist(err) {
-		t.Skip("Skipping integration test: sample data not found")
-	}
-
+	// 设置Gin为测试模式
+	gin.SetMode(gin.TestMode)
+	
+	// 测试结束后清理测试数据
+	defer os.RemoveAll("./test_data")
+	
+	// 创建服务器并启动工作池
 	router, taskQueue, workerPool := setupIntegrationTestServer()
+	
+	// 测试结束后停止工作池
 	defer workerPool.Stop()
 
 	// 用于存储任务ID，供后续测试使用
@@ -337,7 +347,7 @@ func TestAPISuite(t *testing.T) {
 	
 	// 测试8: 监控API - 获取任务统计信息
 	t.Run("GetTaskStats", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/monitor/tasks/stats", nil)
+		req, _ := http.NewRequest("GET", "/monitor/tasks/stats", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -355,7 +365,7 @@ func TestAPISuite(t *testing.T) {
 	
 	// 测试9: 监控API - 获取任务列表
 	t.Run("GetTasks", func(t *testing.T) {
-		req, _ := http.NewRequest("GET", "/api/v1/monitor/tasks", nil)
+		req, _ := http.NewRequest("GET", "/monitor/tasks", nil)
 		w := httptest.NewRecorder()
 		router.ServeHTTP(w, req)
 
@@ -384,7 +394,7 @@ func TestAPISuite(t *testing.T) {
 			"taskId": taskID,
 		}
 		jsonData, _ := json.Marshal(retryRequest)
-		req, _ := http.NewRequest("POST", "/api/v1/monitor/tasks/retry", bytes.NewBuffer(jsonData))
+		req, _ := http.NewRequest("POST", "/monitor/tasks/retry", bytes.NewBuffer(jsonData))
 		req.Header.Set("Content-Type", "application/json")
 		
 		w := httptest.NewRecorder()
@@ -431,7 +441,7 @@ func TestAPISuite(t *testing.T) {
 			"taskId": "test-discard-task",
 		}
 		jsonData, _ := json.Marshal(discardRequest)
-		req, _ := http.NewRequest("POST", "/api/v1/monitor/tasks/discard", bytes.NewBuffer(jsonData))
+		req, _ := http.NewRequest("POST", "/monitor/tasks/discard", bytes.NewBuffer(jsonData))
 		req.Header.Set("Content-Type", "application/json")
 		
 		w := httptest.NewRecorder()
@@ -453,5 +463,22 @@ func TestAPISuite(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, task)
 		assert.Equal(t, "discarded", task.Status)
+	})
+	
+	// 测试12: 健康检查 - 测试工作池停止后的健康状态
+	t.Run("HealthCheckAfterWorkerPoolStop", func(t *testing.T) {
+		// 停止工作池
+		workerPool.Stop()
+		
+		req, _ := http.NewRequest("GET", "/health", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]string
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "ok", response["status"])
 	})
 }
