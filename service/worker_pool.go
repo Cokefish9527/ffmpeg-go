@@ -169,12 +169,12 @@ func (wp *WorkerPool) GetWorkerCount() int {
 
 // GetActiveWorkerCount 获取活跃Worker数量
 func (wp *WorkerPool) GetActiveWorkerCount() int {
-	wp.mutex.Lock()
-	defer wp.mutex.Unlock()
+    wp.mutex.Lock()
+    defer wp.mutex.Unlock()
     
     activeCount := 0
     for _, worker := range wp.workers {
-        if worker.IsActive() { // 假设Worker结构体有一个IsActive方法来判断是否活跃
+        if worker.IsActive() { // 使用IsActive方法来判断是否活跃
             activeCount++
         }
     }
@@ -274,113 +274,54 @@ func tryEncoderWithFallback(encoder, listFile, outPath string, width, height, fp
 	return err
 }
 
-// 检查错误是否是EOF
-func isEOF(err error) bool {
-	return err != nil && (err == io.EOF || strings.Contains(err.Error(), "EOF"))
-}
-
-// 使用指定编码器运行FFmpeg
-func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps int, preset string) error {
-	utils.Debug("使用指定编码器运行FFmpeg", map[string]string{
-		"encoder": encoder,
-		"width":   fmt.Sprintf("%d", width),
-		"height":  fmt.Sprintf("%d", height),
-		"fps":     fmt.Sprintf("%d", fps),
-		"preset":  preset,
-	})
-	
-	// 构建命令
-	var cmd *exec.Cmd
-	
-	// 根据编码器类型选择合适的预设
-	encoderPreset := preset
-	if encoder != "libx264" {
-		// 硬件编码器通常支持更少的预设选项
-		encoderPreset = "fast" // 大多数硬件编码器都支持fast预设
-	}
-	
-	// 对于不同编码器，使用不同的优化参数
-	switch encoder {
-	case "h264_nvenc":
-		// NVENC编码器不支持CRF模式，使用cq模式
-		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
-			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
-			"-c:v", encoder, "-cq", "28", "-preset", encoderPreset,
-			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
-			"-threads", "0", // 自动选择线程数
-			outPath, "-y")
-	case "libx264":
-		// libx264编码器使用CRF模式
-		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
-			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
-			"-c:v", encoder, "-crf", "28", "-preset", encoderPreset,
-			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
-			"-threads", "0", // 自动选择线程数
-			outPath, "-y")
-	default:
-		// 其他编码器使用通用参数
-		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
-			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
-			"-c:v", encoder, "-crf", "28", "-preset", encoderPreset,
-			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
-			"-threads", "0", // 自动选择线程数
-			outPath, "-y")
-	}
-	
-	utils.Debug("执行FFmpeg命令", map[string]string{"command": fmt.Sprintf("%v", cmd.Args)})
-	
-	// 执行命令
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		utils.Error("FFmpeg执行失败", map[string]string{
-			"encoder": encoder,
-			"error":   err.Error(),
-			"output":  string(output),
-		})
-		return errors.Wrapf(err, "ffmpeg执行失败, 输出: %s", string(output))
-	}
-	
-	utils.Debug("FFmpeg执行成功", map[string]string{"encoder": encoder})
-	return nil
-}
-
 // Worker 工作者结构
 type Worker struct {
-	id            int
-	taskQueue     queue.TaskQueue
-	goroutinePool *utils.GoroutinePool
+    id            int
+    taskQueue     queue.TaskQueue
+    goroutinePool *utils.GoroutinePool
+    isActive      bool // 添加isActive字段表示工作状态
+}
+
+// IsActive 检查工作线程是否活跃
+func (w *Worker) IsActive() bool {
+    return w.isActive
 }
 
 // NewWorker 创建新的工作者
 func NewWorker(taskQueue queue.TaskQueue, goroutinePool *utils.GoroutinePool) *Worker {
-	utils.Debug("创建新的工作者", nil)
-	
-	return &Worker{
-		id:            0, // 实际项目中应该分配唯一ID
-		taskQueue:     taskQueue,
-		goroutinePool: goroutinePool,
-	}
+    utils.Debug("创建新的工作者", nil)
+    
+    return &Worker{
+        id:            0, // 实际项目中应该分配唯一ID
+        taskQueue:     taskQueue,
+        goroutinePool: goroutinePool,
+        isActive:      true, // 初始化为活跃状态
+    }
 }
 
 // Start 启动工作者
 func (w *Worker) Start(ctx context.Context) {
-	utils.Info("工作者启动", nil)
-	
-	// 持续处理任务直到上下文被取消
-	for {
-		select {
-		case <-ctx.Done():
-			// 上下文被取消，退出循环
-			utils.Info("工作者收到停止信号", nil)
-			return
-		default:
-			// 处理下一个任务
-			w.processNextTask()
-			
-			// 短暂休眠以避免过度占用CPU
-			time.Sleep(100 * time.Millisecond)
-		}
-	}
+    utils.Info("工作者启动", nil)
+    
+    // 设置 isActive 为 true
+    w.isActive = true // 确保在启动时设置为 true
+
+    // 持续处理任务直到上下文被取消
+    for {
+        select {
+        case <-ctx.Done():
+            // 上下文被取消，退出循环
+            utils.Info("工作者收到停止信号", nil)
+            w.isActive = false // 在停止时设置为 false
+            return
+        default:
+            // 处理下一个任务
+            w.processNextTask()
+            
+            // 短暂休眠以避免过度占用CPU
+            time.Sleep(100 * time.Millisecond)
+        }
+    }
 }
 
 // processNextTask 处理下一个任务
@@ -929,4 +870,74 @@ func (w *Worker) parallelDecode(inputFiles []string, workDir string) ([]string, 
 	
 	utils.Info("并行解码完成", map[string]string{"decodedFiles": fmt.Sprintf("%v", decodedFiles)})
 	return decodedFiles, nil
+}
+
+// 检查错误是否是EOF
+func isEOF(err error) bool {
+	return err != nil && (err == io.EOF || strings.Contains(err.Error(), "EOF"))
+}
+
+// 使用指定编码器运行FFmpeg
+func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps int, preset string) error {
+	utils.Debug("使用指定编码器运行FFmpeg", map[string]string{
+		"encoder": encoder,
+		"width":   fmt.Sprintf("%d", width),
+		"height":  fmt.Sprintf("%d", height),
+		"fps":     fmt.Sprintf("%d", fps),
+		"preset":  preset,
+	})
+	
+	// 构建命令
+	var cmd *exec.Cmd
+	
+	// 根据编码器类型选择合适的预设
+	encoderPreset := preset
+	if encoder != "libx264" {
+		// 硬件编码器通常支持更少的预设选项
+		encoderPreset = "fast" // 大多数硬件编码器都支持fast预设
+	}
+	
+	// 对于不同编码器，使用不同的优化参数
+	switch encoder {
+	case "h264_nvenc":
+		// NVENC编码器不支持CRF模式，使用cq模式
+		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
+			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
+			"-c:v", encoder, "-cq", "28", "-preset", encoderPreset,
+			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
+			"-threads", "0", // 自动选择线程数
+			outPath, "-y")
+	case "libx264":
+		// libx264编码器使用CRF模式
+		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
+			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
+			"-c:v", encoder, "-crf", "28", "-preset", encoderPreset,
+			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
+			"-threads", "0", // 自动选择线程数
+			outPath, "-y")
+	default:
+		// 其他编码器使用通用参数
+		cmd = exec.Command("ffmpeg", "-f", "concat", "-safe", "0", "-i", listFile,
+			"-vf", fmt.Sprintf("scale=%d:%d,fps=%d", width, height, fps),
+			"-c:v", encoder, "-crf", "28", "-preset", encoderPreset,
+			"-c:a", "aac", "-b:a", "96k", // 降低音频比特率
+			"-threads", "0", // 自动选择线程数
+			outPath, "-y")
+	}
+	
+	utils.Debug("执行FFmpeg命令", map[string]string{"command": fmt.Sprintf("%v", cmd.Args)})
+	
+	// 执行命令
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		utils.Error("FFmpeg执行失败", map[string]string{
+			"encoder": encoder,
+			"error":   err.Error(),
+			"output":  string(output),
+		})
+		return errors.Wrapf(err, "ffmpeg执行失败, 输出: %s", string(output))
+	}
+	
+	utils.Debug("FFmpeg执行成功", map[string]string{"encoder": encoder})
+	return nil
 }

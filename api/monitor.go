@@ -56,6 +56,7 @@ type SystemStats struct {
 	DiskUsed      uint64    `json:"diskUsed"`
 	Goroutines    int       `json:"goroutines"`
 	WorkerCount   int       `json:"workerCount"`
+	ActiveWorkers int       `json:"activeWorkers"` // 添加活跃Worker数量字段
 	TaskQueueSize int       `json:"taskQueueSize"`
 }
 
@@ -110,6 +111,10 @@ func (m *MonitorAPI) GetSystemStats(c *gin.Context) {
 		tasks = []*queue.Task{}
 	}
 	
+	// 获取Worker统计信息
+	workerCount := m.workerPool.GetWorkerCount()
+	activeWorkers := m.workerPool.GetActiveWorkerCount()
+	
 	stats := &SystemStats{
 		Timestamp:     time.Now(),
 		CPUUsage:      totalUsage,
@@ -120,7 +125,8 @@ func (m *MonitorAPI) GetSystemStats(c *gin.Context) {
 		DiskTotal:     diskInfo.Total,
 		DiskUsed:      diskInfo.Used,
 		Goroutines:    runtime.NumGoroutine(),
-		WorkerCount:   m.workerPool.GetWorkerCount(),
+		WorkerCount:   workerCount,
+		ActiveWorkers: activeWorkers,
 		TaskQueueSize: len(tasks),
 	}
 	

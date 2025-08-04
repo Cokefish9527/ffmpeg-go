@@ -401,10 +401,10 @@
             fetch(`${API_BASE}/monitor/stats`)
                 .then(response => response.json())
                 .then(data => {
-                    document.getElementById('cpuUsage').textContent = (data.cpuUsage * 100).toFixed(1) + '%';
-                    document.getElementById('memoryUsage').textContent = (data.memoryUsage / 1024 / 1024).toFixed(0) + ' MB';
-                    document.getElementById('goroutines').textContent = data.goroutineCount;
-                    document.getElementById('workersActive').textContent = data.activeWorkers + '/' + data.totalWorkers;
+                    document.getElementById('cpuUsage').textContent = data.cpuUsage.toFixed(1) + '%';
+                    document.getElementById('memoryUsage').textContent = (data.memoryUsed / 1024 / 1024).toFixed(0) + ' MB';
+                    document.getElementById('goroutines').textContent = data.goroutines;
+                    document.getElementById('workersActive').textContent = data.activeWorkers + '/' + data.workerCount;
                 })
                 .catch(error => {
                     console.error('获取系统统计信息失败:', error);
