@@ -1,13 +1,19 @@
 package api
 
+import (
+	"github.com/u2takey/ffmpeg-go/service"
+)
+
 // VideoEditRequest 视频编辑请求结构体
 type VideoEditRequest struct {
 	// Spec 视频编辑规范，包含具体的编辑参数和配置
-	Spec       interface{} `json:"spec"`
+	Spec       interface{}        `json:"spec"`
 	// OutputPath 本地输出路径，指定视频文件保存的本地路径
-	OutputPath string      `json:"outputPath,omitempty"` // 本地输出路径
+	OutputPath string             `json:"outputPath,omitempty"` // 本地输出路径
 	// OSSOutput 阿里云OSS输出配置，用于将输出文件上传到OSS
-	OSSOutput  *OSSOutput  `json:"ossOutput,omitempty"`  // OSS 输出配置
+	OSSOutput  *OSSOutput         `json:"ossOutput,omitempty"`  // OSS 输出配置
+	// Priority 任务优先级
+	Priority   service.TaskPriority `json:"priority,omitempty"`   // 任务优先级
 }
 
 // OSSOutput 阿里云OSS输出配置
@@ -39,19 +45,21 @@ type VideoEditResponse struct {
 // TaskStatusResponse 任务状态响应结构体
 type TaskStatusResponse struct {
 	// TaskID 任务ID
-	TaskID    string  `json:"taskId"`
+	TaskID    string             `json:"taskId"`
 	// Status 任务当前状态，如"pending"、"processing"、"completed"、"failed"
-	Status    string  `json:"status"`
+	Status    string             `json:"status"`
 	// Progress 任务进度百分比，范围0-1
-	Progress  float64 `json:"progress"`
+	Progress  float64            `json:"progress"`
 	// Message 任务相关的消息或错误信息
-	Message   string  `json:"message,omitempty"`
+	Message   string             `json:"message,omitempty"`
 	// Created 任务创建时间，RFC3339格式
-	Created   string  `json:"created,omitempty"`
+	Created   string             `json:"created,omitempty"`
 	// Started 任务开始处理时间，RFC3339格式
-	Started   string  `json:"started,omitempty"`
+	Started   string             `json:"started,omitempty"`
 	// Finished 任务完成时间，RFC3339格式
-	Finished  string  `json:"finished,omitempty"`
+	Finished  string             `json:"finished,omitempty"`
 	// OutputURL 输出文件的URL地址
-	OutputURL string  `json:"outputUrl,omitempty"`
+	OutputURL string             `json:"outputUrl,omitempty"`
+	// Priority 任务优先级
+	Priority  service.TaskPriority `json:"priority,omitempty"`   // 任务优先级
 }

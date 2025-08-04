@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>视频合成服务监控面板</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+        }
+        h1 {
+            color: #333;
+            margin: 0;
+        }
+        .dashboard {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        .card {
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .card h2 {
+            margin-top: 0;
+            color: #555;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 10px;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+        }
+        .stat-item {
+            padding: 10px;
+            background: #f9f9f9;
+            border-radius: 4px;
+        }
+        .stat-label {
+            font-size: 14px;
+            color: #777;
+        }
+        .stat-value {
+            font-size: 20px;
+            font-weight: bold;
+            color: #333;
+        }
+        .task-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 10px;
+        }
+        .task-table th, .task-table td {
+            padding: 12px;
+            text-align: left;
+            border-bottom: 1px solid #eee;
+        }
+        .task-table th {
+            background-color: #f8f9fa;
+            font-weight: 600;
+        }
+        .status-pending {
+            color: #ffc107;
+            font-weight: bold;
+        }
+        .status-processing {
+            color: #17a2b8;
+            font-weight: bold;
+        }
+        .status-completed {
+            color: #28a745;
+            font-weight: bold;
+        }
+        .status-failed {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .priority-low {
+            color: #6c757d;
+        }
+        .priority-normal {
+            color: #28a745;
+        }
+        .priority-high {
+            color: #ffc107;
+        }
+        .priority-critical {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        .refresh-btn {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        .refresh-btn:hover {
+            background: #0056b3;
+        }
+        .controls {
+            margin: 20px 0;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>视频合成服务监控面板</h1>
+        </header>
+        
+        <div class="controls">
+            <button class="refresh-btn" onclick="refreshData()">刷新数据</button>
+        </div>
+        
+        <div class="dashboard">
+            <div class="card">
+                <h2>系统状态</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">CPU使用率</div>
+                        <div id="cpu-usage" class="stat-value">0%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">内存使用率</div>
+                        <div id="memory-usage" class="stat-value">0%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">磁盘使用率</div>
+                        <div id="disk-usage" class="stat-value">0%</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Goroutines</div>
+                        <div id="goroutines" class="stat-value">0</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="card">
+                <h2>任务统计</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-label">总任务数</div>
+                        <div id="total-tasks" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">待处理</div>
+                        <div id="pending-tasks" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">处理中</div>
+                        <div id="processing-tasks" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">已完成</div>
+                        <div id="completed-tasks" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">失败</div>
+                        <div id="failed-tasks" class="stat-value">0</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-label">Workers</div>
+                        <div id="workers" class="stat-value">0</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>任务列表</h2>
+            <table class="task-table">
+                <thead>
+                    <tr>
+                        <th>任务ID</th>
+                        <th>状态</th>
+                        <th>优先级</th>
+                        <th>创建时间</th>
+                        <th>开始时间</th>
+                        <th>完成时间</th>
+                        <th>进度</th>
+                    </tr>
+                </thead>
+                <tbody id="task-list">
+                    <tr>
+                        <td colspan="7" style="text-align: center;">暂无数据</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        // 刷新所有数据
+        function refreshData() {
+            fetchSystemStats();
+            fetchTaskStats();
+            fetchTasks();
+            fetchWorkerStats();
+        }
+        
+        // 获取系统统计信息
+        function fetchSystemStats() {
+            fetch('/api/v1/monitor/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('cpu-usage').textContent = data.cpuUsage.toFixed(2) + '%';
+                    document.getElementById('memory-usage').textContent = data.memoryUsage.toFixed(2) + '%';
+                    document.getElementById('disk-usage').textContent = data.diskUsage.toFixed(2) + '%';
+                    document.getElementById('goroutines').textContent = data.goroutines;
+                })
+                .catch(error => {
+                    console.error('获取系统统计信息失败:', error);
+                });
+        }
+        
+        // 获取任务统计信息
+        function fetchTaskStats() {
+            fetch('/api/v1/monitor/tasks/stats')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('total-tasks').textContent = data.totalTasks;
+                    document.getElementById('pending-tasks').textContent = data.pendingTasks;
+                    document.getElementById('processing-tasks').textContent = data.processingTasks;
+                    document.getElementById('completed-tasks').textContent = data.completedTasks;
+                    document.getElementById('failed-tasks').textContent = data.failedTasks;
+                })
+                .catch(error => {
+                    console.error('获取任务统计信息失败:', error);
+                });
+        }
+        
+        // 获取Worker统计信息
+        function fetchWorkerStats() {
+            fetch('/api/v1/monitor/workers')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('workers').textContent = data.workerCount;
+                })
+                .catch(error => {
+                    console.error('获取Worker统计信息失败:', error);
+                });
+        }
+        
+        // 获取任务列表
+        function fetchTasks() {
+            fetch('/api/v1/monitor/tasks')
+                .then(response => response.json())
+                .then(data => {
+                    const taskList = document.getElementById('task-list');
+                    taskList.innerHTML = '';
+                    
+                    if (data.length === 0) {
+                        taskList.innerHTML = '<tr><td colspan="7" style="text-align: center;">暂无数据</td></tr>';
+                        return;
+                    }
+                    
+                    data.forEach(task => {
+                        const row = document.createElement('tr');
+                        
+                        // 格式化时间
+                        const created = task.created ? new Date(task.created).toLocaleString() : '-';
+                        const started = task.started ? new Date(task.started).toLocaleString() : '-';
+                        const finished = task.finished ? new Date(task.finished).toLocaleString() : '-';
+                        
+                        // 状态和优先级样式
+                        const statusClass = `status-${task.status}`;
+                        const priorityClass = `priority-${getPriorityText(task.priority)}`;
+                        
+                        row.innerHTML = `
+                            <td>${task.id}</td>
+                            <td class="${statusClass}">${getStatusText(task.status)}</td>
+                            <td class="${priorityClass}">${getPriorityText(task.priority)}</td>
+                            <td>${created}</td>
+                            <td>${started}</td>
+                            <td>${finished}</td>
+                            <td>${(task.progress * 100).toFixed(0)}%</td>
+                        `;
+                        
+                        taskList.appendChild(row);
+                    });
+                })
+                .catch(error => {
+                    console.error('获取任务列表失败:', error);
+                });
+        }
+        
+        // 获取状态文本
+        function getStatusText(status) {
+            switch (status) {
+                case 'pending': return '待处理';
+                case 'processing': return '处理中';
+                case 'completed': return '已完成';
+                case 'failed': return '失败';
+                default: return status;
+            }
+        }
+        
+        // 获取优先级文本
+        function getPriorityText(priority) {
+            switch (priority) {
+                case 0: return '低';
+                case 1: return '普通';
+                case 2: return '高';
+                case 3: return '紧急';
+                default: return priority;
+            }
+        }
+        
+        // 页面加载完成后自动刷新数据
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshData();
+            // 每10秒自动刷新一次
+            setInterval(refreshData, 10000);
+        });
+    </script>
+</body>
+</html>

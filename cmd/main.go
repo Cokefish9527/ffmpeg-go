@@ -10,6 +10,7 @@ import (
 	"time"
 	
 	"github.com/gin-gonic/gin"
+	"github.com/u2takey/ffmpeg-go/api"
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
 	"github.com/u2takey/ffmpeg-go/utils"
@@ -32,6 +33,7 @@ var (
 	taskQueue queue.TaskQueue // 使用queue包中的TaskQueue接口
 	editorService service.VideoEditor
 	workerPool *service.WorkerPool
+	monitorAPI *api.MonitorAPI
 )
 
 func main() {
@@ -62,6 +64,10 @@ func main() {
 	// 启动工作池
 	workerPool.Start()
 	utils.Info("工作池启动完成", nil)
+	
+	// 创建监控API
+	monitorAPI = api.NewMonitorAPI(taskQueue, workerPool)
+	utils.Info("监控API创建完成", nil)
 	
 	// 启动一个goroutine来监听系统信号，用于优雅关闭
 	go func() {
@@ -107,7 +113,18 @@ func main() {
 		// 添加WorkerPool管理接口
 		apiGroup.GET("/workerpool/status", getWorkerPoolStatus)
 		apiGroup.POST("/workerpool/resize", resizeWorkerPool)
+		
+		// 添加监控接口
+		apiGroup.GET("/monitor/stats", monitorAPI.GetSystemStats)
+		apiGroup.GET("/monitor/tasks/stats", monitorAPI.GetTaskStats)
+		apiGroup.GET("/monitor/tasks", monitorAPI.GetTasks)
+		apiGroup.GET("/monitor/tasks/:taskId", monitorAPI.GetTaskDetail)
+		apiGroup.GET("/monitor/workers", monitorAPI.GetWorkerStats)
 	}
+	
+	// 提供静态文件服务
+	r.StaticFile("/", "./web/index.html")
+	r.Static("/static", "./web")
 	
 	// 从环境变量获取端口，默认为8082
 	port := os.Getenv("PORT")
