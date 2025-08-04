@@ -103,6 +103,10 @@ func main() {
 		})
 	})
 	
+	// 提供静态文件服务
+	r.StaticFile("/", "./web/index.html")
+	r.Static("/static", "./web")
+	
 	// 定义API路由组
 	apiGroup := r.Group("/api/v1")
 	{
@@ -120,11 +124,11 @@ func main() {
 		apiGroup.GET("/monitor/tasks", monitorAPI.GetTasks)
 		apiGroup.GET("/monitor/tasks/:taskId", monitorAPI.GetTaskDetail)
 		apiGroup.GET("/monitor/workers", monitorAPI.GetWorkerStats)
+		// 添加任务管理接口
+		apiGroup.POST("/monitor/tasks/retry", monitorAPI.RetryTask)
+		apiGroup.POST("/monitor/tasks/cancel", monitorAPI.CancelTask)
+		apiGroup.POST("/monitor/tasks/discard", monitorAPI.DiscardTask)
 	}
-	
-	// 提供静态文件服务
-	r.StaticFile("/", "./web/index.html")
-	r.Static("/static", "./web")
 	
 	// 从环境变量获取端口，默认为8082
 	port := os.Getenv("PORT")
@@ -134,10 +138,30 @@ func main() {
 	
 	utils.Info("服务启动中", map[string]string{"port": port})
 	log.Printf("Server starting on port %s", port)
-	if err := r.Run(":" + port); err != nil {
-		utils.Error("服务启动失败", map[string]string{"error": err.Error()})
-		log.Fatal("Failed to start server:", err)
+	
+	// 使用环境变量中的端口启动服务
+	server := &http.Server{
+		Addr:    ":" + port,
+		Handler: r,
 	}
+	
+	go func() {
+		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			utils.Error("服务启动失败", map[string]string{"error": err.Error()})
+			log.Fatal("Failed to start server:", err)
+		}
+	}()
+	
+	// 等待中断信号以优雅地关闭服务器
+	sigChan := make(chan os.Signal, 1)
+	signal.Notify(sigChan, syscall.SIGINT, syscall.SIGTERM)
+	<-sigChan
+	
+	utils.Info("服务正在关闭", nil)
+	
+	// 关闭工作池
+	workerPool.Stop()
+	utils.Info("工作池已停止", nil)
 }
 
 // submitVideoEdit 处理视频编辑任务提交请求

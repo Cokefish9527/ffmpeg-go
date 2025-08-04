@@ -11,25 +11,25 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/u2takey/ffmpeg-go/api"
+	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
 )
 
 // setupIntegrationTestServer 设置集成测试服务器
-func setupIntegrationTestServer() (*gin.Engine, *service.InMemoryTaskQueue, *service.WorkerPool) {
+func setupIntegrationTestServer() (*gin.Engine, queue.TaskQueue, *service.WorkerPool) {
 	// 设置Gin为测试模式
 	gin.SetMode(gin.TestMode)
 
 	// 初始化任务队列
-	taskQueue := service.NewInMemoryTaskQueue()
+	taskQueue := queue.NewInMemoryTaskQueue()
 
 	// 初始化视频编辑服务
 	editorService := service.NewVideoEditorService(taskQueue)
 
 	// 初始化工作池，使用2个worker
-	workerPool := service.NewWorkerPool(2)
+	workerPool := service.NewWorkerPool(2, taskQueue)
 
 	// 创建Gin引擎
 	r := gin.New()
@@ -46,7 +46,7 @@ func setupIntegrationTestServer() (*gin.Engine, *service.InMemoryTaskQueue, *ser
 	apiRoutes := r.Group("/api/v1")
 	{
 		apiRoutes.POST("/video/edit", func(c *gin.Context) {
-			var req api.VideoEditRequest
+			var req service.VideoEditRequest
 			if err := c.ShouldBindJSON(&req); err != nil {
 				c.JSON(http.StatusBadRequest, gin.H{
 					"error": "Invalid request format",
@@ -54,38 +54,19 @@ func setupIntegrationTestServer() (*gin.Engine, *service.InMemoryTaskQueue, *ser
 				return
 			}
 
-			// 生成任务ID
-			taskID := uuid.New().String()
-
-			// 创建任务对象
-			task := &service.Task{
-				ID:       taskID,
-				Spec:     req.Spec,
-				Status:   "pending",
-				Created:  time.Now(),
-				Progress: 0.0,
-			}
-
-			// 将任务添加到队列
-			if err := taskQueue.Add(task); err != nil {
+			// 提交任务到视频编辑服务
+			task, err := editorService.SubmitTask(&req)
+			if err != nil {
 				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": "Failed to add task to queue",
-				})
-				return
-			}
-
-			// 提交任务到工作池
-			if err := workerPool.SubmitTask(task); err != nil {
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"error": "Failed to submit task to worker pool",
+					"error": "Failed to submit task",
 				})
 				return
 			}
 
 			// 返回成功响应
 			response := api.VideoEditResponse{
-				TaskID:  taskID,
-				Status:  "accepted",
+				TaskID:  task.ID,
+				Status:  task.Status,
 				Message: "Task accepted for processing",
 			}
 
@@ -147,6 +128,17 @@ func setupIntegrationTestServer() (*gin.Engine, *service.InMemoryTaskQueue, *ser
 				"taskId":  taskID,
 			})
 		})
+		
+		// 添加监控API路由
+		monitorAPI := api.NewMonitorAPI(taskQueue, workerPool)
+		apiRoutes.GET("/monitor/stats", monitorAPI.GetSystemStats)
+		apiRoutes.GET("/monitor/tasks/stats", monitorAPI.GetTaskStats)
+		apiRoutes.GET("/monitor/tasks", monitorAPI.GetTasks)
+		apiRoutes.GET("/monitor/tasks/:taskId", monitorAPI.GetTaskDetail)
+		apiRoutes.GET("/monitor/workers", monitorAPI.GetWorkerStats)
+		// 添加任务管理接口
+		apiRoutes.POST("/monitor/tasks/retry", monitorAPI.RetryTask)
+		apiRoutes.POST("/monitor/tasks/cancel", monitorAPI.CancelTask)
 	}
 
 	// 启动工作池
@@ -185,7 +177,7 @@ func TestAPISuite(t *testing.T) {
 	// 测试2: 提交视频编辑任务
 	t.Run("SubmitVideoEdit", func(t *testing.T) {
 		// 构造请求数据
-		requestData := api.VideoEditRequest{
+		requestData := service.VideoEditRequest{
 			Spec: map[string]interface{}{
 				"inputs": []map[string]interface{}{
 					{
@@ -196,7 +188,6 @@ func TestAPISuite(t *testing.T) {
 					"filename": "../examples/sample_data/output_test.mp4",
 				},
 			},
-			OutputPath: "../examples/sample_data/output_test.mp4",
 		}
 
 		jsonData, _ := json.Marshal(requestData)
@@ -212,7 +203,7 @@ func TestAPISuite(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
 		assert.NotEmpty(t, response.TaskID)
-		assert.Equal(t, "accepted", response.Status)
+		assert.Equal(t, "pending", response.Status)
 		assert.Equal(t, "Task accepted for processing", response.Message)
 
 		// 保存任务ID供后续测试使用
@@ -342,5 +333,125 @@ func TestAPISuite(t *testing.T) {
 		err := json.Unmarshal(w.Body.Bytes(), &response)
 		assert.NoError(t, err)
 		assert.Equal(t, "Task not found", response["error"])
+	})
+	
+	// 测试8: 监控API - 获取任务统计信息
+	t.Run("GetTaskStats", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/monitor/tasks/stats", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Contains(t, response, "totalTasks")
+		assert.Contains(t, response, "pendingTasks")
+		assert.Contains(t, response, "processingTasks")
+		assert.Contains(t, response, "completedTasks")
+		assert.Contains(t, response, "failedTasks")
+	})
+	
+	// 测试9: 监控API - 获取任务列表
+	t.Run("GetTasks", func(t *testing.T) {
+		req, _ := http.NewRequest("GET", "/api/v1/monitor/tasks", nil)
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+
+		assert.Equal(t, http.StatusOK, w.Code)
+
+		var response []map[string]interface{}
+		err := json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.NotEmpty(t, response)
+	})
+	
+	// 测试10: 监控API - 任务重试功能
+	t.Run("RetryTask", func(t *testing.T) {
+		if taskID == "" {
+			t.Skip("Skipping: no task ID from previous test")
+		}
+		
+		// 首先确认任务是失败状态
+		task, err := taskQueue.Get(taskID)
+		assert.NoError(t, err)
+		assert.NotNil(t, task)
+		assert.Equal(t, "failed", task.Status)
+		
+		// 调用重试接口
+		retryRequest := map[string]string{
+			"taskId": taskID,
+		}
+		jsonData, _ := json.Marshal(retryRequest)
+		req, _ := http.NewRequest("POST", "/api/v1/monitor/tasks/retry", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		
+		assert.Equal(t, http.StatusOK, w.Code)
+		
+		var response map[string]interface{}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "Task retry successfully", response["message"])
+		
+		// 验证任务状态是否已更新为pending
+		task, err = taskQueue.Get(taskID)
+		assert.NoError(t, err)
+		assert.NotNil(t, task)
+		assert.Equal(t, "pending", task.Status)
+		assert.Empty(t, task.Error)
+	})
+	
+	// 测试11: 监控API - 任务丢弃功能
+	t.Run("DiscardTask", func(t *testing.T) {
+		// 创建一个新任务用于测试丢弃功能
+		task := &queue.Task{
+			ID:       "test-discard-task",
+			Status:   "failed",
+			Spec:     map[string]interface{}{"test": "data"},
+			Error:    "test error",
+			Priority: queue.PriorityNormal,
+			Created:  time.Now(),
+		}
+		
+		err := taskQueue.Update(task)
+		assert.NoError(t, err)
+		
+		// 验证任务创建成功
+		createdTask, err := taskQueue.Get("test-discard-task")
+		assert.NoError(t, err)
+		assert.NotNil(t, createdTask)
+		assert.Equal(t, "failed", createdTask.Status)
+		
+		// 调用丢弃接口
+		discardRequest := map[string]string{
+			"taskId": "test-discard-task",
+		}
+		jsonData, _ := json.Marshal(discardRequest)
+		req, _ := http.NewRequest("POST", "/api/v1/monitor/tasks/discard", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		
+		w := httptest.NewRecorder()
+		router.ServeHTTP(w, req)
+		
+		// 打印响应内容用于调试
+		t.Logf("DiscardTask response status: %d", w.Code)
+		t.Logf("DiscardTask response body: %s", w.Body.String())
+		
+		assert.Equal(t, http.StatusOK, w.Code)
+		
+		var response map[string]interface{}
+		err = json.Unmarshal(w.Body.Bytes(), &response)
+		assert.NoError(t, err)
+		assert.Equal(t, "Task discarded successfully", response["message"])
+		
+		// 验证任务状态是否已更新为discarded
+		task, err = taskQueue.Get("test-discard-task")
+		assert.NoError(t, err)
+		assert.NotNil(t, task)
+		assert.Equal(t, "discarded", task.Status)
 	})
 }
