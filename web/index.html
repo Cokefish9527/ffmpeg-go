@@ -75,6 +75,53 @@
         .system-stat-label {
             color: #666;
             margin-top: 5px;
+            position: relative;
+        }
+        
+        .info-icon {
+            display: inline-block;
+            width: 16px;
+            height: 16px;
+            background-color: #ccc;
+            color: white;
+            border-radius: 50%;
+            font-size: 12px;
+            text-align: center;
+            line-height: 16px;
+            cursor: pointer;
+            margin-left: 5px;
+            user-select: none;
+        }
+        
+        .info-tooltip {
+            display: none;
+            position: absolute;
+            bottom: 100%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: #333;
+            color: white;
+            padding: 10px;
+            border-radius: 4px;
+            width: 200px;
+            font-size: 14px;
+            z-index: 1000;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.3);
+        }
+        
+        .info-tooltip::after {
+            content: "";
+            position: absolute;
+            top: 100%;
+            left: 50%;
+            margin-left: -5px;
+            border-width: 5px;
+            border-style: solid;
+            border-color: #333 transparent transparent transparent;
+        }
+        
+        .info-tooltip.show {
+            display: block;
         }
         .stats-container {
             display: grid;
@@ -225,6 +272,18 @@
             margin: 0;
             font-size: 1.5em;
         }
+        .info-icon {
+            margin-left: 8px;
+            cursor: pointer;
+            color: #666;
+            transition: all 0.2s ease;
+        }
+        
+        .info-icon:hover {
+            background-color: #999;
+            transform: scale(1.1);
+        }
+        
     </style>
 </head>
 <body>
@@ -249,11 +308,24 @@
                 </div>
                 <div class="system-stat-card">
                     <div class="system-stat-value" id="goroutines">0</div>
-                    <div class="system-stat-label">Goroutines</div>
+                    <div class="system-stat-label">
+                        Goroutines
+                        <span class="info-icon" data-tooltip="goroutines-info">ℹ</span>
+                        <div id="goroutines-info" class="info-tooltip">
+                            Goroutines是Go语言的轻量级线程，用于处理并发任务。Goroutines数量反映了当前程序的并发活动情况。
+                        </div>
+                    </div>
                 </div>
                 <div class="system-stat-card">
                     <div class="system-stat-value" id="workersActive">0/0</div>
-                    <div class="system-stat-label">活跃Worker</div>
+                    <div class="system-stat-label">
+                        活跃Worker
+                        <span class="info-icon" data-tooltip="workers-info">ℹ</span>
+                        <div id="workers-info" class="info-tooltip">
+                            活跃Worker表示当前正在处理任务的Worker数量。格式为"活跃数/总数"。<br>
+                            Worker是实际执行视频处理任务的工作单元。
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
@@ -370,7 +442,53 @@
             loadAllData();
             // 每30秒自动刷新一次数据
             setInterval(loadAllData, 30000);
+            
+            // 初始化信息提示功能
+            initTooltips();
         };
+        
+        // 初始化信息提示功能
+        function initTooltips() {
+            const infoIcons = document.querySelectorAll('.info-icon');
+            
+            infoIcons.forEach(icon => {
+                // 鼠标悬停事件
+                icon.addEventListener('mouseenter', function() {
+                    const tooltipId = this.getAttribute('data-tooltip');
+                    const tooltip = document.getElementById(tooltipId);
+                    if (tooltip) {
+                        tooltip.classList.add('show');
+                    }
+                });
+                
+                // 鼠标离开事件
+                icon.addEventListener('mouseleave', function() {
+                    const tooltipId = this.getAttribute('data-tooltip');
+                    const tooltip = document.getElementById(tooltipId);
+                    if (tooltip) {
+                        tooltip.classList.remove('show');
+                    }
+                });
+                
+                // 点击事件（用于触摸设备）
+                icon.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    const tooltipId = this.getAttribute('data-tooltip');
+                    const tooltip = document.getElementById(tooltipId);
+                    if (tooltip) {
+                        tooltip.classList.toggle('show');
+                    }
+                });
+            });
+            
+            // 点击页面其他地方隐藏所有提示
+            document.addEventListener('click', function() {
+                const tooltips = document.querySelectorAll('.info-tooltip');
+                tooltips.forEach(tooltip => {
+                    tooltip.classList.remove('show');
+                });
+            });
+        }
         
         // 切换系统信息显示
         function toggleSystemInfo() {
@@ -770,6 +888,22 @@
             if (event.target == modal) {
                 modal.style.display = 'none';
             }
+        }
+        
+        // 切换信息提示显示
+        function toggleInfo(event, infoId) {
+            event.stopPropagation(); // 阻止事件冒泡
+            const infoTooltip = document.getElementById(infoId);
+            infoTooltip.classList.toggle('show');
+            
+            // 添加鼠标悬停效果
+            const infoIcon = event.target;
+            infoIcon.addEventListener('mouseenter', () => {
+                infoTooltip.classList.add('show');
+            });
+            infoIcon.addEventListener('mouseleave', () => {
+                infoTooltip.classList.remove('show');
+            });
         }
     </script>
 </body>
