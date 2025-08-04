@@ -10,19 +10,24 @@ import (
 	"strings"
 	"sync"
 	"time"
+	
+	"github.com/u2takey/ffmpeg-go/queue"
 )
 
 var (
 	taskBeingProcessed = make(map[string]bool)
 	taskMutex          = sync.Mutex{}
-	videoInfoCache     = NewVideoInfoCache() // 全局视频信息缓存
+	videoInfoCache     = NewVideoInfoCache()     // 全局视频信息缓存
+	processingCache    = GlobalProcessingCache   // 全局处理缓存
+	bufferPool         = GlobalBufferPool        // 全局缓冲池
+	framePool          = GlobalFramePool         // 全局帧池
 )
 
 // WorkerPool 工作池结构
 type WorkerPool struct {
 	workers    []*Worker
 	maxWorkers int
-	taskQueue  TaskQueue
+	taskQueue  queue.TaskQueue
 	ctx        context.Context
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
@@ -30,7 +35,7 @@ type WorkerPool struct {
 }
 
 // NewWorkerPool 创建新的工作池
-func NewWorkerPool(maxWorkers int, taskQueue TaskQueue) *WorkerPool {
+func NewWorkerPool(maxWorkers int, taskQueue queue.TaskQueue) *WorkerPool {
 	// 如果未指定最大工作线程数，则使用CPU核心数
 	if maxWorkers <= 0 {
 		maxWorkers = runtime.NumCPU()
@@ -180,8 +185,9 @@ func tryEncoderWithFallback(encoder, listFile, outPath string, width, height, fp
 		return runFFmpegWithEncoder("libx264", listFile, outPath, width, height, fps, preset)
 	}
 	
-	// 如果已经是libx264还失败，则返回错误
-	return err
+// 检查错误是否是EOF
+func isEOF(err error) bool {
+	return err.Error() == "EOF"
 }
 
 // 使用指定编码器运行FFmpeg
@@ -233,14 +239,28 @@ func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps 
 	return nil
 }
 
+// Remove the TaskCacheKey type as it's not needed anymore since we're using the cache package directly
+
 // Worker 工作者结构
 type Worker struct {
 	id        int
-	taskQueue TaskQueue
+	taskQueue queue.TaskQueue
+}
+
+// Task 结构体（简化版，实际项目中应该从task包导入）
+type Task struct {
+	ID       string
+	Status   string
+	Priority int
+	Spec     interface{}
+	Error    string
+	Started  time.Time
+	Finished time.Time
+	Result   string
 }
 
 // NewWorker 创建新的工作者
-func NewWorker(taskQueue TaskQueue) *Worker {
+func NewWorker(taskQueue queue.TaskQueue) *Worker {
 	return &Worker{
 		id:        0, // 实际项目中应该分配唯一ID
 		taskQueue: taskQueue,
@@ -273,25 +293,27 @@ func (w *Worker) processNextTask() {
 		return
 	}
 
-	// 查找待处理的任务
-	for _, task := range tasks {
-		if task.Status == "pending" {
-			// 使用互斥锁确保只有一个Worker处理这个任务
-			taskMutex.Lock()
-			if !taskBeingProcessed[task.ID] {
-				taskBeingProcessed[task.ID] = true
+	// 查找待处理的任务（按优先级顺序）
+	for priority := queue.PriorityCritical; priority >= queue.PriorityLow; priority-- {
+		for _, task := range tasks {
+			if task.Status == "pending" && task.Priority == priority {
+				// 使用互斥锁确保只有一个Worker处理这个任务
+				taskMutex.Lock()
+				if !taskBeingProcessed[task.ID] {
+					taskBeingProcessed[task.ID] = true
+					taskMutex.Unlock()
+					
+					// 更新任务状态为处理中
+					task.Status = "processing"
+					task.Started = time.Now()
+					w.taskQueue.Update(task)
+					
+					// 处理任务
+					w.processTask(task)
+					return
+				}
 				taskMutex.Unlock()
-				
-				// 更新任务状态为处理中
-				task.Status = "processing"
-				task.Started = time.Now()
-				w.taskQueue.Update(task)
-				
-				// 处理任务
-				w.processTask(task)
-				return
 			}
-			taskMutex.Unlock()
 		}
 	}
 }
@@ -377,6 +399,7 @@ func (w *Worker) processTask(task *Task) {
 	// 根据视频质量和目标质量选择合适的编码预设
 	preset := encodingPreset // 使用配置的预设
 	
+	// 根据视频质量和目标质量选择合适的编码预设
 	// 如果目标分辨率较低，可以使用更快的编码
 	if width <= 640 && height <= 480 {
 		preset = "fast"
@@ -411,74 +434,35 @@ func (w *Worker) processTask(task *Task) {
 	taskMutex.Unlock()
 }
 
-// ParallelDecodeForTest 用于测试的并行解码方法
-func (w *Worker) ParallelDecodeForTest(inputFiles []string, workDir string) ([]string, error) {
-	return w.parallelDecode(inputFiles, workDir)
-}
-
-// parallelDecode 并行解码输入文件
-func (w *Worker) parallelDecode(inputFiles []string, workDir string) ([]string, error) {
-	// 创建临时目录用于存储解码后的文件
-	tempDir := filepath.Join(workDir, "temp", fmt.Sprintf("decode_%d", time.Now().UnixNano()))
-	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		return nil, fmt.Errorf("创建临时目录失败: %v", err)
-	}
-	
-	// 使用WaitGroup等待所有解码任务完成
-	var wg sync.WaitGroup
-	decodedFiles := make([]string, len(inputFiles))
-	errors := make(chan error, len(inputFiles))
-	
-	// 并行解码所有输入文件
-	for i, file := range inputFiles {
-		wg.Add(1)
-		go func(index int, inputFile string) {
-			defer wg.Done()
-			
-			// 构造完整输入文件路径
-			fullInputPath := filepath.Join(workDir, "video", inputFile)
-			
-			// 构造输出文件路径
-			outputFile := fmt.Sprintf("decoded_%d.mp4", index)
-			fullOutputPath := filepath.Join(tempDir, outputFile)
-			decodedFiles[index] = fullOutputPath
-			
-			// 使用ffmpeg解码文件
-			// 这里我们直接转码为统一格式，以便后续处理
-			cmd := exec.Command("ffmpeg", "-i", fullInputPath,
-				"-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
-				"-c:a", "aac", "-b:a", "96k",
-				"-threads", "0",
-				fullOutputPath, "-y")
-			
-			output, err := cmd.CombinedOutput()
-			if err != nil {
-				errors <- fmt.Errorf("解码文件 %s 失败: %v, 输出: %s", inputFile, err, string(output))
-				return
-			}
-		}(i, file)
-	}
-	
-	// 等待所有解码任务完成
-	wg.Wait()
-	close(errors)
-	
-	// 检查是否有错误
-	if len(errors) > 0 {
-		// 清理临时目录
-		os.RemoveAll(tempDir)
-		return nil, <-errors
-	}
-	
-	return decodedFiles, nil
-}
-
 // mergeVideos 合并视频文件
 func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height, fps int, preset string) error {
 	// 获取当前工作目录
 	wd, err := os.Getwd()
 	if err != nil {
 		return fmt.Errorf("无法获取当前工作目录: %v", err)
+	}
+
+	// 创建缓存键
+	cacheKey := &TaskCacheKey{
+		InputFiles: inputFiles,
+		Width:      width,
+		Height:     height,
+		FPS:        fps,
+		Preset:     preset,
+	}
+	key := cacheKey.GenerateKey()
+
+	// 检查缓存中是否存在结果
+	if entry, exists := processingCache.Get(key); exists {
+		// 缓存命中，直接复制文件
+		fmt.Printf("缓存命中，使用缓存结果: %s\n", entry.OutputFile)
+		
+		// 使用全局缓冲池复制文件
+		if err := copyFileWithBufferPool(entry.OutputFile, outPath); err != nil {
+			return fmt.Errorf("复制缓存文件失败: %v", err)
+		}
+		
+		return nil
 	}
 
 	// 预处理输入文件（分析视频信息，但不改变文件）
@@ -544,5 +528,128 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 		return fmt.Errorf("输出文件未生成")
 	}
 
+	// 将结果添加到缓存
+	fileInfo, err := os.Stat(outPath)
+	if err == nil {
+		entry := &CacheEntry{
+			OutputFile: outPath,
+			CreatedAt:  time.Now(),
+			Size:       fileInfo.Size(),
+		}
+		processingCache.Put(key, entry)
+	}
+
 	return nil
+}
+
+// copyFileWithBufferPool 使用缓冲池复制文件
+func copyFileWithBufferPool(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer destFile.Close()
+
+	// 使用缓冲池获取缓冲区
+	buf := bufferPool.Get(64 * 1024) // 64KB缓冲区
+	defer bufferPool.Put(buf)
+
+	// 复制文件
+	_, err = copyWithBuffer(sourceFile, destFile, buf)
+	return err
+}
+
+// copyWithBuffer 使用指定缓冲区复制数据
+func copyWithBuffer(src, dst *os.File, buf []byte) (int64, error) {
+	var written int64
+	for {
+		nr, err := src.Read(buf)
+		if nr > 0 {
+			nw, err := dst.Write(buf[:nr])
+			if nw > 0 {
+				written += int64(nw)
+			}
+			if err != nil {
+				return written, err
+			}
+			if nr != nw {
+				return written, fmt.Errorf("写入不完整")
+			}
+		}
+		if err != nil {
+			if err == io.EOF { // 修正EOF检查
+				break
+			}
+			return written, err
+		}
+	}
+	return written, nil
+}
+
+// ParallelDecodeForTest 用于测试的并行解码方法
+func (w *Worker) ParallelDecodeForTest(inputFiles []string, workDir string) ([]string, error) {
+	return w.parallelDecode(inputFiles, workDir)
+}
+
+// parallelDecode 并行解码输入文件
+func (w *Worker) parallelDecode(inputFiles []string, workDir string) ([]string, error) {
+	// 创建临时目录用于存储解码后的文件
+	tempDir := filepath.Join(workDir, "temp", fmt.Sprintf("decode_%d", time.Now().UnixNano()))
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return nil, fmt.Errorf("创建临时目录失败: %v", err)
+	}
+	
+	// 使用WaitGroup等待所有解码任务完成
+	var wg sync.WaitGroup
+	decodedFiles := make([]string, len(inputFiles))
+	errors := make(chan error, len(inputFiles))
+	
+	// 并行解码所有输入文件
+	for i, file := range inputFiles {
+		wg.Add(1)
+		go func(index int, inputFile string) {
+			defer wg.Done()
+			
+			// 构造完整输入文件路径
+			fullInputPath := filepath.Join(workDir, "video", inputFile)
+			
+			// 构造输出文件路径
+			outputFile := fmt.Sprintf("decoded_%d.mp4", index)
+			fullOutputPath := filepath.Join(tempDir, outputFile)
+			decodedFiles[index] = fullOutputPath
+			
+			// 使用ffmpeg解码文件
+			// 这里我们直接转码为统一格式，以便后续处理
+			cmd := exec.Command("ffmpeg", "-i", fullInputPath,
+				"-c:v", "libx264", "-preset", "ultrafast", "-crf", "28",
+				"-c:a", "aac", "-b:a", "96k",
+				"-threads", "0",
+				fullOutputPath, "-y")
+			
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				errors <- fmt.Errorf("解码文件 %s 失败: %v, 输出: %s", inputFile, err, string(output))
+				return
+			}
+		}(i, file)
+	}
+	
+	// 等待所有解码任务完成
+	wg.Wait()
+	close(errors)
+	
+	// 检查是否有错误
+	if len(errors) > 0 {
+		// 清理临时目录
+		os.RemoveAll(tempDir)
+		return nil, <-errors
+	}
+	
+	return decodedFiles, nil
 }
