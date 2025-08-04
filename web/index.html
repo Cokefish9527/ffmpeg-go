@@ -208,6 +208,21 @@
             color: #f44336;
             font-weight: bold;
         }
+        .button-group {
+            display: flex;
+            gap: 5px;
+            flex-wrap: nowrap;
+        }
+        
+        .button-group .btn {
+            flex: 1;
+            min-width: 80px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 5px;
+        }
+        
         .btn {
             padding: 6px 12px;
             border: none;
@@ -284,6 +299,17 @@
             transform: scale(1.1);
         }
         
+        .icon-view::before {
+            content: "👁";
+        }
+        
+        .icon-retry::before {
+            content: "🔄";
+        }
+        
+        .icon-discard::before {
+            content: "🗑";
+        }
     </style>
 </head>
 <body>
@@ -607,15 +633,17 @@
                             <td>${task.executionCount || 1}</td>
                             <td>${lastExecutionTime}</td>
                             <td>
-                                <button class="btn btn-view" onclick="viewExecutions('${task.id}')">查看</button>
-                                ${task.status === 'failed' ? 
-                                    `<button class="btn btn-retry" onclick="retryTask('${task.id}')">重试</button>` : 
-                                    ''
-                                }
-                                ${(task.status === 'failed' || task.status === 'completed') ? 
-                                    `<button class="btn btn-discard" onclick="discardTask('${task.id}')">丢弃</button>` : 
-                                    ''
-                                }
+                                <div class="button-group">
+                                    <button class="btn btn-view" onclick="viewExecutions('${task.id}')">查看</button>
+                                    ${task.status === 'failed' ? 
+                                        `<button class="btn btn-retry" onclick="retryTask('${task.id}')">重试</button>` : 
+                                        ''
+                                    }
+                                    ${(task.status === 'failed' || task.status === 'completed') ? 
+                                        `<button class="btn btn-discard" onclick="discardTask('${task.id}')">丢弃</button>` : 
+                                        ''
+                                    }
+                                </div>
                             </td>
                         `;
                         
@@ -672,9 +700,11 @@
                             <td>${lastExecutionTime}</td>
                             <td>${task.error || 'N/A'}</td>
                             <td>
-                                <button class="btn btn-view" onclick="viewExecutions('${task.id}')">查看</button>
-                                <button class="btn btn-retry" onclick="retryTask('${task.id}')">重试</button>
-                                <button class="btn btn-discard" onclick="discardTask('${task.id}')">丢弃</button>
+                                <div class="button-group">
+                                    <button class="btn btn-view" onclick="viewExecutions('${task.id}')">查看</button>
+                                    <button class="btn btn-retry" onclick="retryTask('${task.id}')">重试</button>
+                                    <button class="btn btn-discard" onclick="discardTask('${task.id}')">丢弃</button>
+                                </div>
                             </td>
                         `;
                         
