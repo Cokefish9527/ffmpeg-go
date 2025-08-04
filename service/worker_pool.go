@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -185,9 +186,13 @@ func tryEncoderWithFallback(encoder, listFile, outPath string, width, height, fp
 		return runFFmpegWithEncoder("libx264", listFile, outPath, width, height, fps, preset)
 	}
 	
+	// 如果已经是libx264还失败，则返回错误
+	return err
+}
+
 // 检查错误是否是EOF
 func isEOF(err error) bool {
-	return err.Error() == "EOF"
+	return err != nil && err == io.EOF
 }
 
 // 使用指定编码器运行FFmpeg
@@ -239,24 +244,10 @@ func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps 
 	return nil
 }
 
-// Remove the TaskCacheKey type as it's not needed anymore since we're using the cache package directly
-
 // Worker 工作者结构
 type Worker struct {
 	id        int
 	taskQueue queue.TaskQueue
-}
-
-// Task 结构体（简化版，实际项目中应该从task包导入）
-type Task struct {
-	ID       string
-	Status   string
-	Priority int
-	Spec     interface{}
-	Error    string
-	Started  time.Time
-	Finished time.Time
-	Result   string
 }
 
 // NewWorker 创建新的工作者
@@ -319,7 +310,7 @@ func (w *Worker) processNextTask() {
 }
 
 // processTask 处理单个任务
-func (w *Worker) processTask(task *Task) {
+func (w *Worker) processTask(task *queue.Task) {
 	// 尝试将任务的Spec转换为EditSpec
 	// 这里暂时简化处理，实际项目中应该使用更完善的解析方法
 	spec, ok := task.Spec.(map[string]interface{})
@@ -399,7 +390,6 @@ func (w *Worker) processTask(task *Task) {
 	// 根据视频质量和目标质量选择合适的编码预设
 	preset := encodingPreset // 使用配置的预设
 	
-	// 根据视频质量和目标质量选择合适的编码预设
 	// 如果目标分辨率较低，可以使用更快的编码
 	if width <= 640 && height <= 480 {
 		preset = "fast"
@@ -457,7 +447,7 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 		// 缓存命中，直接复制文件
 		fmt.Printf("缓存命中，使用缓存结果: %s\n", entry.OutputFile)
 		
-		// 使用全局缓冲池复制文件
+		// 使用缓冲池复制文件
 		if err := copyFileWithBufferPool(entry.OutputFile, outPath); err != nil {
 			return fmt.Errorf("复制缓存文件失败: %v", err)
 		}
@@ -583,7 +573,7 @@ func copyWithBuffer(src, dst *os.File, buf []byte) (int64, error) {
 			}
 		}
 		if err != nil {
-			if err == io.EOF { // 修正EOF检查
+			if isEOF(err) {
 				break
 			}
 			return written, err

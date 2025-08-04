@@ -4,26 +4,28 @@ import (
 	"time"
 )
 
-// Task 任务结构体
-type Task struct {
-	ID        string      `json:"id"`
-	Spec      interface{} `json:"spec"`
-	Status    string      `json:"status"`
-	Created   time.Time   `json:"created"`
-	Started   time.Time   `json:"started"`
-	Finished  time.Time   `json:"finished"`
-	Result    string      `json:"result"`
-	Error     string      `json:"error"`
-	Progress  float64     `json:"progress"`
-}
+// TaskPriority 任务优先级
+type TaskPriority int
 
-// TaskQueue 任务队列接口
-type TaskQueue interface {
-	Add(task *Task) error
-	Get(taskID string) (*Task, error)
-	List() ([]*Task, error)
-	Remove(taskID string) error
-	Update(task *Task) error
+const (
+	PriorityLow TaskPriority = iota
+	PriorityNormal
+	PriorityHigh
+	PriorityCritical
+)
+
+// Task 任务结构
+type Task struct {
+	ID        string        `json:"id"`
+	Status    string        `json:"status"`
+	Spec      interface{}   `json:"spec"`
+	Result    string        `json:"result"`
+	Error     string        `json:"error"`
+	Created   time.Time     `json:"created"`
+	Started   time.Time     `json:"started"`
+	Finished  time.Time     `json:"finished"`
+	Progress  float64       `json:"progress"`
+	Priority  TaskPriority  `json:"priority"` // 添加优先级字段
 }
 
 // InMemoryTaskQueue 内存任务队列实现
