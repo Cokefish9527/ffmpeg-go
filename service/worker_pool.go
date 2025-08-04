@@ -12,7 +12,9 @@ import (
 	"sync"
 	"time"
 	
+	"github.com/pkg/errors"
 	"github.com/u2takey/ffmpeg-go/queue"
+	"github.com/u2takey/ffmpeg-go/utils"
 )
 
 var (
@@ -44,6 +46,11 @@ func NewWorkerPool(maxWorkers int, taskQueue queue.TaskQueue) *WorkerPool {
 	
 	ctx, cancel := context.WithCancel(context.Background())
 	
+	utils.Info("创建工作池", map[string]string{
+		"maxWorkers": fmt.Sprintf("%d", maxWorkers),
+		"cpuCount":   fmt.Sprintf("%d", runtime.NumCPU()),
+	})
+	
 	return &WorkerPool{
 		workers:    make([]*Worker, 0),
 		maxWorkers: maxWorkers,
@@ -70,6 +77,7 @@ func (wp *WorkerPool) Start() {
 		}(worker)
 	}
 	
+	utils.Info("工作池启动完成", map[string]string{"workerCount": fmt.Sprintf("%d", wp.maxWorkers)})
 	fmt.Printf("WorkerPool started with %d workers\n", wp.maxWorkers)
 }
 
@@ -78,12 +86,15 @@ func (wp *WorkerPool) Stop() {
 	wp.mutex.Lock()
 	defer wp.mutex.Unlock()
 	
+	utils.Info("正在停止工作池", nil)
+	
 	// 取消上下文，通知所有工作线程停止
 	wp.cancel()
 	
 	// 等待所有工作线程完成
 	wp.wg.Wait()
 	
+	utils.Info("工作池已停止", nil)
 	fmt.Println("WorkerPool stopped")
 }
 
@@ -98,6 +109,11 @@ func (wp *WorkerPool) Resize(newSize int) {
 	
 	currentSize := len(wp.workers)
 	
+	utils.Info("调整工作池大小", map[string]string{
+		"currentSize": fmt.Sprintf("%d", currentSize),
+		"newSize":     fmt.Sprintf("%d", newSize),
+	})
+	
 	if newSize > currentSize {
 		// 增加Worker数量
 		for i := currentSize; i < newSize; i++ {
@@ -110,10 +126,18 @@ func (wp *WorkerPool) Resize(newSize int) {
 				w.Start(wp.ctx)
 			}(worker)
 		}
+		utils.Info("工作池扩容完成", map[string]string{
+			"addedWorkers": fmt.Sprintf("%d", newSize-currentSize),
+			"totalWorkers": fmt.Sprintf("%d", newSize),
+		})
 		fmt.Printf("WorkerPool resized from %d to %d workers (added %d workers)\n", currentSize, newSize, newSize-currentSize)
 	} else if newSize < currentSize {
 		// 减少Worker数量（这里简化处理，实际项目中应该更优雅地处理）
 		wp.workers = wp.workers[:newSize]
+		utils.Info("工作池缩容完成", map[string]string{
+			"removedWorkers": fmt.Sprintf("%d", currentSize-newSize),
+			"totalWorkers":   fmt.Sprintf("%d", newSize),
+		})
 		fmt.Printf("WorkerPool resized from %d to %d workers (removed %d workers)\n", currentSize, newSize, currentSize-newSize)
 		// 注意：实际项目中需要更仔细地处理正在运行的Worker
 	}
@@ -128,25 +152,36 @@ func (wp *WorkerPool) GetWorkerCount() int {
 
 // 检测可用的硬件编码器
 func detectHardwareEncoders() map[string]bool {
+	utils.Debug("检测硬件编码器", nil)
+	
 	encoders := make(map[string]bool)
 	
 	// 检测NVIDIA NVENC
 	cmd := exec.Command("ffmpeg", "-h", "encoder=h264_nvenc")
 	if err := cmd.Run(); err == nil {
 		encoders["h264_nvenc"] = true
+		utils.Debug("检测到NVIDIA NVENC编码器", nil)
 	}
 	
 	// 检测Intel Quick Sync
 	cmd = exec.Command("ffmpeg", "-h", "encoder=h264_qsv")
 	if err := cmd.Run(); err == nil {
 		encoders["h264_qsv"] = true
+		utils.Debug("检测到Intel Quick Sync编码器", nil)
 	}
 	
 	// 检测AMD VCE
 	cmd = exec.Command("ffmpeg", "-h", "encoder=h264_amf")
 	if err := cmd.Run(); err == nil {
 		encoders["h264_amf"] = true
+		utils.Debug("检测到AMD VCE编码器", nil)
 	}
+	
+	utils.Debug("硬件编码器检测完成", map[string]string{
+		"nvenc": fmt.Sprintf("%t", encoders["h264_nvenc"]),
+		"qsv":   fmt.Sprintf("%t", encoders["h264_qsv"]),
+		"amf":   fmt.Sprintf("%t", encoders["h264_amf"]),
+	})
 	
 	return encoders
 }
@@ -157,46 +192,72 @@ func selectBestEncoder() string {
 	
 	// 优先级顺序：NVENC > QSV > AMF > libx264
 	if availableEncoders["h264_nvenc"] {
+		utils.Info("选择NVIDIA NVENC作为编码器", nil)
 		return "h264_nvenc"
 	}
 	
 	if availableEncoders["h264_qsv"] {
+		utils.Info("选择Intel Quick Sync作为编码器", nil)
 		return "h264_qsv"
 	}
 	
 	if availableEncoders["h264_amf"] {
+		utils.Info("选择AMD VCE作为编码器", nil)
 		return "h264_amf"
 	}
 	
 	// 默认使用libx264
+	utils.Info("选择libx264作为编码器", nil)
 	return "libx264"
 }
 
 // 尝试使用指定编码器，如果失败则降级到libx264
 func tryEncoderWithFallback(encoder, listFile, outPath string, width, height, fps int, preset string) error {
+	utils.Info("尝试使用编码器", map[string]string{
+		"encoder": encoder,
+		"width":   fmt.Sprintf("%d", width),
+		"height":  fmt.Sprintf("%d", height),
+		"fps":     fmt.Sprintf("%d", fps),
+		"preset":  preset,
+	})
+	
 	// 首先尝试使用指定的编码器
 	err := runFFmpegWithEncoder(encoder, listFile, outPath, width, height, fps, preset)
 	if err == nil {
+		utils.Info("编码器使用成功", map[string]string{"encoder": encoder})
 		return nil // 成功则直接返回
 	}
 	
 	// 如果失败且不是libx264，则尝试降级到libx264
 	if encoder != "libx264" {
+		utils.Warn("编码器使用失败，尝试降级到libx264", map[string]string{
+			"encoder": encoder,
+			"error":   err.Error(),
+		})
 		fmt.Printf("使用编码器 %s 失败，降级到 libx264: %v\n", encoder, err)
 		return runFFmpegWithEncoder("libx264", listFile, outPath, width, height, fps, preset)
 	}
 	
 	// 如果已经是libx264还失败，则返回错误
+	utils.Error("libx264编码器使用失败", map[string]string{"error": err.Error()})
 	return err
 }
 
 // 检查错误是否是EOF
 func isEOF(err error) bool {
-	return err != nil && err == io.EOF
+	return err != nil && (err == io.EOF || strings.Contains(err.Error(), "EOF"))
 }
 
 // 使用指定编码器运行FFmpeg
 func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps int, preset string) error {
+	utils.Debug("使用指定编码器运行FFmpeg", map[string]string{
+		"encoder": encoder,
+		"width":   fmt.Sprintf("%d", width),
+		"height":  fmt.Sprintf("%d", height),
+		"fps":     fmt.Sprintf("%d", fps),
+		"preset":  preset,
+	})
+	
 	// 构建命令
 	var cmd *exec.Cmd
 	
@@ -235,12 +296,20 @@ func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps 
 			outPath, "-y")
 	}
 	
+	utils.Debug("执行FFmpeg命令", map[string]string{"command": fmt.Sprintf("%v", cmd.Args)})
+	
 	// 执行命令
 	output, err := cmd.CombinedOutput()
 	if err != nil {
-		return fmt.Errorf("ffmpeg执行失败: %v, 输出: %s", err, string(output))
+		utils.Error("FFmpeg执行失败", map[string]string{
+			"encoder": encoder,
+			"error":   err.Error(),
+			"output":  string(output),
+		})
+		return errors.Wrapf(err, "ffmpeg执行失败, 输出: %s", string(output))
 	}
 	
+	utils.Debug("FFmpeg执行成功", map[string]string{"encoder": encoder})
 	return nil
 }
 
@@ -252,6 +321,8 @@ type Worker struct {
 
 // NewWorker 创建新的工作者
 func NewWorker(taskQueue queue.TaskQueue) *Worker {
+	utils.Debug("创建新的工作者", nil)
+	
 	return &Worker{
 		id:        0, // 实际项目中应该分配唯一ID
 		taskQueue: taskQueue,
@@ -260,11 +331,14 @@ func NewWorker(taskQueue queue.TaskQueue) *Worker {
 
 // Start 启动工作者
 func (w *Worker) Start(ctx context.Context) {
+	utils.Info("工作者启动", nil)
+	
 	// 持续处理任务直到上下文被取消
 	for {
 		select {
 		case <-ctx.Done():
 			// 上下文被取消，退出循环
+			utils.Info("工作者收到停止信号", nil)
 			return
 		default:
 			// 处理下一个任务
@@ -281,6 +355,8 @@ func (w *Worker) processNextTask() {
 	// 获取所有任务
 	tasks, err := w.taskQueue.List()
 	if err != nil {
+		utils.Error("获取任务列表失败", map[string]string{"error": err.Error()})
+		fmt.Printf("获取任务列表失败: %v\n", err)
 		return
 	}
 
@@ -294,10 +370,26 @@ func (w *Worker) processNextTask() {
 					taskBeingProcessed[task.ID] = true
 					taskMutex.Unlock()
 					
+					utils.Info("开始处理任务", map[string]string{
+						"taskId":   task.ID,
+						"priority": fmt.Sprintf("%d", task.Priority),
+					})
+					
 					// 更新任务状态为处理中
 					task.Status = "processing"
 					task.Started = time.Now()
-					w.taskQueue.Update(task)
+					err := w.taskQueue.Update(task)
+					if err != nil {
+						utils.Error("更新任务状态失败", map[string]string{
+							"taskId": task.ID,
+							"error":  err.Error(),
+						})
+						fmt.Printf("更新任务状态失败: %v\n", err)
+						taskMutex.Lock()
+						delete(taskBeingProcessed, task.ID)
+						taskMutex.Unlock()
+						return
+					}
 					
 					// 处理任务
 					w.processTask(task)
@@ -311,6 +403,20 @@ func (w *Worker) processNextTask() {
 
 // processTask 处理单个任务
 func (w *Worker) processTask(task *queue.Task) {
+	utils.Info("开始处理任务", map[string]string{"taskId": task.ID})
+	
+	defer func() {
+		// 清理任务处理标记
+		taskMutex.Lock()
+		delete(taskBeingProcessed, task.ID)
+		taskMutex.Unlock()
+		
+		utils.Info("任务处理完成", map[string]string{
+			"taskId": task.ID,
+			"status": task.Status,
+		})
+	}()
+	
 	// 尝试将任务的Spec转换为EditSpec
 	// 这里暂时简化处理，实际项目中应该使用更完善的解析方法
 	spec, ok := task.Spec.(map[string]interface{})
@@ -321,10 +427,7 @@ func (w *Worker) processTask(task *queue.Task) {
 		task.Finished = time.Now()
 		w.taskQueue.Update(task)
 		
-		// 清理任务处理标记
-		taskMutex.Lock()
-		delete(taskBeingProcessed, task.ID)
-		taskMutex.Unlock()
+		utils.Error("任务处理失败：无效的视频编辑规范", map[string]string{"taskId": task.ID})
 		return
 	}
 
@@ -402,34 +505,83 @@ func (w *Worker) processTask(task *queue.Task) {
 
 	// 实际执行视频合并操作
 	if outPath != "" && width > 0 && height > 0 {
-		err := w.mergeVideos(inputFiles, outPath, width, height, fps, preset)
-		if err != nil {
-			task.Status = "failed"
-			task.Error = fmt.Sprintf("视频合并失败: %v", err)
-		} else {
-			task.Status = "completed"
-			task.Result = outPath
+		// 重试机制
+		var err error
+		maxRetries := 3
+		for i := 0; i <= maxRetries; i++ {
+			utils.Info("开始视频合并", map[string]string{
+				"taskId":   task.ID,
+				"attempt":  fmt.Sprintf("%d", i+1),
+				"maxRetry": fmt.Sprintf("%d", maxRetries),
+			})
+			
+			err = w.mergeVideos(inputFiles, outPath, width, height, fps, preset)
+			if err == nil {
+				task.Status = "completed"
+				task.Result = outPath
+				
+				utils.Info("视频合并成功", map[string]string{
+					"taskId":  task.ID,
+					"attempt": fmt.Sprintf("%d", i+1),
+				})
+				break
+			}
+			
+			// 如果是最后一次重试，记录错误
+			if i == maxRetries {
+				task.Status = "failed"
+				task.Error = fmt.Sprintf("视频合并失败（已重试%d次）: %v", maxRetries, err)
+				
+				utils.Error("视频合并最终失败", map[string]string{
+					"taskId":   task.ID,
+					"attempts": fmt.Sprintf("%d", maxRetries+1),
+					"error":    err.Error(),
+				})
+				break
+			}
+			
+			// 等待一段时间后重试
+			utils.Warn("视频合并失败，准备重试", map[string]string{
+				"taskId":   task.ID,
+				"attempt":  fmt.Sprintf("%d", i+1),
+				"delay":    fmt.Sprintf("%d", (i+1)*2),
+				"error":    err.Error(),
+			})
+			fmt.Printf("视频合并失败，%d秒后进行第%d次重试: %v\n", (i+1)*2, i+1, err)
+			time.Sleep(time.Duration(i+1) * 2 * time.Second)
 		}
 	} else {
 		task.Status = "failed"
 		task.Error = "缺少必要的视频编辑参数"
+		
+		utils.Error("任务处理失败：缺少必要的视频编辑参数", map[string]string{
+			"taskId":  task.ID,
+			"outPath": outPath,
+			"width":   fmt.Sprintf("%d", width),
+			"height":  fmt.Sprintf("%d", height),
+		})
 	}
 
 	task.Finished = time.Now()
 	w.taskQueue.Update(task)
-	
-	// 清理任务处理标记
-	taskMutex.Lock()
-	delete(taskBeingProcessed, task.ID)
-	taskMutex.Unlock()
 }
 
 // mergeVideos 合并视频文件
 func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height, fps int, preset string) error {
+	utils.Info("开始合并视频", map[string]string{
+		"inputFiles": fmt.Sprintf("%v", inputFiles),
+		"outPath":    outPath,
+		"width":      fmt.Sprintf("%d", width),
+		"height":     fmt.Sprintf("%d", height),
+		"fps":        fmt.Sprintf("%d", fps),
+		"preset":     preset,
+	})
+	
 	// 获取当前工作目录
 	wd, err := os.Getwd()
 	if err != nil {
-		return fmt.Errorf("无法获取当前工作目录: %v", err)
+		utils.Error("获取当前工作目录失败", map[string]string{"error": err.Error()})
+		return errors.Wrap(err, "无法获取当前工作目录")
 	}
 
 	// 创建缓存键
@@ -445,26 +597,40 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 	// 检查缓存中是否存在结果
 	if entry, exists := processingCache.Get(key); exists {
 		// 缓存命中，直接复制文件
+		utils.Info("缓存命中", map[string]string{"cachedFile": entry.OutputFile})
 		fmt.Printf("缓存命中，使用缓存结果: %s\n", entry.OutputFile)
 		
 		// 使用缓冲池复制文件
 		if err := copyFileWithBufferPool(entry.OutputFile, outPath); err != nil {
-			return fmt.Errorf("复制缓存文件失败: %v", err)
+			utils.Error("复制缓存文件失败", map[string]string{
+				"source": entry.OutputFile,
+				"target": outPath,
+				"error":  err.Error(),
+			})
+			return errors.Wrap(err, "复制缓存文件失败")
 		}
 		
+		utils.Info("缓存文件复制成功", map[string]string{
+			"source": entry.OutputFile,
+			"target": outPath,
+		})
 		return nil
 	}
 
 	// 预处理输入文件（分析视频信息，但不改变文件）
+	utils.Debug("开始预处理输入文件", nil)
 	_, err = videoInfoCache.PreprocessInputFiles(inputFiles, wd)
 	if err != nil {
-		return fmt.Errorf("预处理输入文件失败: %v", err)
+		utils.Error("预处理输入文件失败", map[string]string{"error": err.Error()})
+		return errors.Wrap(err, "预处理输入文件失败")
 	}
 
 	// 并行解码输入文件
+	utils.Debug("开始并行解码", nil)
 	decodedFiles, err := w.parallelDecode(inputFiles, wd)
 	if err != nil {
-		return fmt.Errorf("并行解码失败: %v", err)
+		utils.Error("并行解码失败", map[string]string{"error": err.Error()})
+		return errors.Wrap(err, "并行解码失败")
 	}
 	
 	// 记得清理临时文件
@@ -472,6 +638,7 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 		// 获取临时目录路径并删除
 		if len(decodedFiles) > 0 {
 			tempDir := filepath.Dir(decodedFiles[0])
+			utils.Debug("清理临时文件", map[string]string{"tempDir": tempDir})
 			os.RemoveAll(tempDir)
 		}
 	}()
@@ -486,15 +653,18 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 	// 检查所有输入文件是否存在
 	for _, file := range fullInputFiles {
 		if _, err := os.Stat(file); os.IsNotExist(err) {
-			return fmt.Errorf("输入文件不存在: %s", file)
+			utils.Error("输入文件不存在", map[string]string{"file": file})
+			return errors.Wrapf(err, "输入文件不存在: %s", file)
 		}
 	}
 
 	// 创建临时文件列表用于concat
 	listFile := filepath.Join(wd, "video", "file_list.txt")
+	utils.Debug("创建文件列表", map[string]string{"listFile": listFile})
 	file, err := os.Create(listFile)
 	if err != nil {
-		return fmt.Errorf("无法创建文件列表: %v", err)
+		utils.Error("创建文件列表失败", map[string]string{"error": err.Error()})
+		return errors.Wrap(err, "无法创建文件列表")
 	}
 	defer os.Remove(listFile)
 
@@ -505,17 +675,21 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 	file.Close()
 
 	// 选择最佳编码器
+	utils.Debug("选择最佳编码器", nil)
 	videoEncoder := selectBestEncoder()
 	
 	// 尝试使用选定的编码器，如果失败则降级
+	utils.Info("开始视频编码", map[string]string{"encoder": videoEncoder})
 	err = tryEncoderWithFallback(videoEncoder, listFile, outPath, width, height, fps, preset)
 	if err != nil {
-		return fmt.Errorf("视频编码失败: %v", err)
+		utils.Error("视频编码失败", map[string]string{"error": err.Error()})
+		return errors.Wrap(err, "视频编码失败")
 	}
 
 	// 检查输出文件是否存在
 	if _, err := os.Stat(outPath); os.IsNotExist(err) {
-		return fmt.Errorf("输出文件未生成")
+		utils.Error("输出文件未生成", map[string]string{"outPath": outPath})
+		return errors.New("输出文件未生成")
 	}
 
 	// 将结果添加到缓存
@@ -527,22 +701,41 @@ func (w *Worker) mergeVideos(inputFiles []string, outPath string, width, height,
 			Size:       fileInfo.Size(),
 		}
 		processingCache.Put(key, entry)
+		
+		utils.Info("处理结果已缓存", map[string]string{
+			"outPath": outPath,
+			"size":    fmt.Sprintf("%d", fileInfo.Size()),
+		})
 	}
 
+	utils.Info("视频合并完成", map[string]string{"outPath": outPath})
 	return nil
 }
 
 // copyFileWithBufferPool 使用缓冲池复制文件
 func copyFileWithBufferPool(src, dst string) error {
+	utils.Debug("使用缓冲池复制文件", map[string]string{
+		"source": src,
+		"target": dst,
+	})
+	
 	sourceFile, err := os.Open(src)
 	if err != nil {
-		return err
+		utils.Error("打开源文件失败", map[string]string{
+			"source": src,
+			"error":  err.Error(),
+		})
+		return errors.Wrap(err, "无法打开源文件")
 	}
 	defer sourceFile.Close()
 
 	destFile, err := os.Create(dst)
 	if err != nil {
-		return err
+		utils.Error("创建目标文件失败", map[string]string{
+			"target": dst,
+			"error":  err.Error(),
+		})
+		return errors.Wrap(err, "无法创建目标文件")
 	}
 	defer destFile.Close()
 
@@ -552,6 +745,13 @@ func copyFileWithBufferPool(src, dst string) error {
 
 	// 复制文件
 	_, err = copyWithBuffer(sourceFile, destFile, buf)
+	if err != nil {
+		utils.Error("复制文件失败", map[string]string{
+			"source": src,
+			"target": dst,
+			"error":  err.Error(),
+		})
+	}
 	return err
 }
 
@@ -566,17 +766,21 @@ func copyWithBuffer(src, dst *os.File, buf []byte) (int64, error) {
 				written += int64(nw)
 			}
 			if err != nil {
-				return written, err
+				utils.Error("写入文件失败", map[string]string{"error": err.Error()})
+				return written, errors.Wrap(err, "写入文件失败")
 			}
 			if nr != nw {
-				return written, fmt.Errorf("写入不完整")
+				utils.Error("写入不完整", nil)
+				return written, errors.New("写入不完整")
 			}
 		}
 		if err != nil {
 			if isEOF(err) {
+				utils.Debug("文件复制完成", nil)
 				break
 			}
-			return written, err
+			utils.Error("读取文件失败", map[string]string{"error": err.Error()})
+			return written, errors.Wrap(err, "读取文件失败")
 		}
 	}
 	return written, nil
@@ -589,22 +793,33 @@ func (w *Worker) ParallelDecodeForTest(inputFiles []string, workDir string) ([]s
 
 // parallelDecode 并行解码输入文件
 func (w *Worker) parallelDecode(inputFiles []string, workDir string) ([]string, error) {
+	utils.Info("开始并行解码", map[string]string{
+		"inputFiles": fmt.Sprintf("%v", inputFiles),
+	})
+	
 	// 创建临时目录用于存储解码后的文件
 	tempDir := filepath.Join(workDir, "temp", fmt.Sprintf("decode_%d", time.Now().UnixNano()))
+	utils.Debug("创建临时目录", map[string]string{"tempDir": tempDir})
 	if err := os.MkdirAll(tempDir, 0755); err != nil {
-		return nil, fmt.Errorf("创建临时目录失败: %v", err)
+		utils.Error("创建临时目录失败", map[string]string{"error": err.Error()})
+		return nil, errors.Wrap(err, "创建临时目录失败")
 	}
 	
 	// 使用WaitGroup等待所有解码任务完成
 	var wg sync.WaitGroup
 	decodedFiles := make([]string, len(inputFiles))
-	errors := make(chan error, len(inputFiles))
+	errorsChan := make(chan error, len(inputFiles))
 	
 	// 并行解码所有输入文件
 	for i, file := range inputFiles {
 		wg.Add(1)
 		go func(index int, inputFile string) {
 			defer wg.Done()
+			
+			utils.Debug("开始解码单个文件", map[string]string{
+				"index":     fmt.Sprintf("%d", index),
+				"inputFile": inputFile,
+			})
 			
 			// 构造完整输入文件路径
 			fullInputPath := filepath.Join(workDir, "video", inputFile)
@@ -622,24 +837,42 @@ func (w *Worker) parallelDecode(inputFiles []string, workDir string) ([]string, 
 				"-threads", "0",
 				fullOutputPath, "-y")
 			
+			utils.Debug("执行FFmpeg解码命令", map[string]string{
+				"command": fmt.Sprintf("%v", cmd.Args),
+			})
+			
 			output, err := cmd.CombinedOutput()
 			if err != nil {
-				errors <- fmt.Errorf("解码文件 %s 失败: %v, 输出: %s", inputFile, err, string(output))
+				utils.Error("解码文件失败", map[string]string{
+					"inputFile": inputFile,
+					"error":     err.Error(),
+					"output":    string(output),
+				})
+				errorsChan <- errors.Wrapf(err, "解码文件 %s 失败, 输出: %s", inputFile, string(output))
 				return
 			}
+			
+			utils.Debug("文件解码成功", map[string]string{
+				"inputFile": inputFile,
+				"outputFile": fullOutputPath,
+			})
 		}(i, file)
 	}
 	
 	// 等待所有解码任务完成
 	wg.Wait()
-	close(errors)
+	close(errorsChan)
 	
 	// 检查是否有错误
-	if len(errors) > 0 {
+	if len(errorsChan) > 0 {
 		// 清理临时目录
+		utils.Warn("解码过程中出现错误，清理临时目录", map[string]string{"tempDir": tempDir})
 		os.RemoveAll(tempDir)
-		return nil, <-errors
+		err := <-errorsChan
+		utils.Error("并行解码失败", map[string]string{"error": err.Error()})
+		return nil, err
 	}
 	
+	utils.Info("并行解码完成", map[string]string{"decodedFiles": fmt.Sprintf("%v", decodedFiles)})
 	return decodedFiles, nil
 }

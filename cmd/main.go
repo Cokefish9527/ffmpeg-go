@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
+	"github.com/u2takey/ffmpeg-go/utils"
 )
 
 // TaskStatusResponse 任务状态响应
@@ -34,11 +35,16 @@ var (
 )
 
 func main() {
+	// 初始化全局日志记录器
+	utils.InitGlobalLogger()
+	utils.Info("服务启动中", map[string]string{"phase": "initialization"})
+	
 	// 设置Gin运行模式
 	gin.SetMode(gin.ReleaseMode)
 	
 	// 初始化任务队列 (使用queue包中的实现)
 	taskQueue = queue.NewInMemoryTaskQueue()
+	utils.Info("任务队列初始化完成", nil)
 	
 	// 从环境变量获取最大工作线程数，默认为0（使用CPU核心数）
 	maxWorkers := 0
@@ -47,12 +53,15 @@ func main() {
 			maxWorkers = num
 		}
 	}
+	utils.Info("工作线程数配置", map[string]string{"maxWorkers": strconv.Itoa(maxWorkers)})
 	
 	// 创建工作池
 	workerPool = service.NewWorkerPool(maxWorkers, taskQueue)
+	utils.Info("工作池创建完成", nil)
 	
 	// 启动工作池
 	workerPool.Start()
+	utils.Info("工作池启动完成", nil)
 	
 	// 启动一个goroutine来监听系统信号，用于优雅关闭
 	go func() {
@@ -62,10 +71,11 @@ func main() {
 		
 		// 等待信号
 		sig := <-sigChan
-		log.Printf("Received signal: %v", sig)
+		utils.Info("收到系统信号", map[string]string{"signal": sig.String()})
 		
 		// 停止工作池
 		workerPool.Stop()
+		utils.Info("工作池已停止", nil)
 		
 		// 退出程序
 		os.Exit(0)
@@ -73,12 +83,15 @@ func main() {
 	
 	// 初始化视频编辑服务
 	editorService = service.NewVideoEditorService(taskQueue)
+	utils.Info("视频编辑服务初始化完成", nil)
 	
 	// 创建Gin引擎
 	r := gin.Default()
+	utils.Info("Gin引擎创建完成", nil)
 	
 	// 定义健康检查端点
 	r.GET("/health", func(c *gin.Context) {
+		utils.Info("健康检查请求", map[string]string{"clientIP": c.ClientIP()})
 		c.JSON(http.StatusOK, gin.H{
 			"status": "ok",
 		})
@@ -102,16 +115,21 @@ func main() {
 		port = "8082"
 	}
 	
+	utils.Info("服务启动中", map[string]string{"port": port})
 	log.Printf("Server starting on port %s", port)
 	if err := r.Run(":" + port); err != nil {
+		utils.Error("服务启动失败", map[string]string{"error": err.Error()})
 		log.Fatal("Failed to start server:", err)
 	}
 }
 
 // submitVideoEdit 处理视频编辑任务提交请求
 func submitVideoEdit(c *gin.Context) {
+	utils.Info("收到视频编辑任务提交请求", map[string]string{"clientIP": c.ClientIP()})
+	
 	var req service.VideoEditRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.Warn("视频编辑请求格式错误", map[string]string{"error": err.Error()})
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request format",
 		})
@@ -121,11 +139,14 @@ func submitVideoEdit(c *gin.Context) {
 	// 创建任务
 	task, err := editorService.SubmitTask(&req)
 	if err != nil {
+		utils.Error("提交任务失败", map[string]string{"error": err.Error()})
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to submit task",
 		})
 		return
 	}
+	
+	utils.Info("任务提交成功", map[string]string{"taskId": task.ID, "priority": string(rune(task.Priority + '0'))})
 	
 	c.JSON(http.StatusAccepted, gin.H{
 		"taskId": task.ID,
@@ -137,9 +158,11 @@ func submitVideoEdit(c *gin.Context) {
 // getVideoEditStatus 获取视频编辑任务状态
 func getVideoEditStatus(c *gin.Context) {
 	taskID := c.Param("taskId")
+	utils.Info("收到任务状态查询请求", map[string]string{"taskId": taskID, "clientIP": c.ClientIP()})
 	
 	task, err := editorService.GetTaskStatus(taskID)
 	if err != nil {
+		utils.Error("获取任务状态失败", map[string]string{"taskId": taskID, "error": err.Error()})
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to get task status",
 		})
@@ -147,6 +170,7 @@ func getVideoEditStatus(c *gin.Context) {
 	}
 	
 	if task == nil {
+		utils.Warn("任务不存在", map[string]string{"taskId": taskID})
 		c.JSON(http.StatusNotFound, gin.H{
 			"error": "Task not found",
 		})
@@ -154,6 +178,7 @@ func getVideoEditStatus(c *gin.Context) {
 	}
 	
 	response := convertTaskToResponse(task)
+	utils.Info("任务状态查询成功", map[string]string{"taskId": taskID, "status": task.Status})
 	
 	c.JSON(http.StatusOK, response)
 }
@@ -161,9 +186,11 @@ func getVideoEditStatus(c *gin.Context) {
 // cancelVideoEdit 取消视频编辑任务
 func cancelVideoEdit(c *gin.Context) {
 	taskID := c.Param("taskId")
+	utils.Info("收到任务取消请求", map[string]string{"taskId": taskID, "clientIP": c.ClientIP()})
 	
 	err := editorService.CancelTask(taskID)
 	if err != nil {
+		utils.Error("取消任务失败", map[string]string{"taskId": taskID, "error": err.Error()})
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "Failed to cancel task",
 			"taskId": taskID,
@@ -171,6 +198,7 @@ func cancelVideoEdit(c *gin.Context) {
 		return
 	}
 	
+	utils.Info("任务取消成功", map[string]string{"taskId": taskID})
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Task cancelled successfully",
 		"taskId": taskID,
@@ -179,20 +207,26 @@ func cancelVideoEdit(c *gin.Context) {
 
 // getWorkerPoolStatus 获取WorkerPool状态
 func getWorkerPoolStatus(c *gin.Context) {
+	utils.Info("收到WorkerPool状态查询请求", map[string]string{"clientIP": c.ClientIP()})
+	
 	status := gin.H{
 		"workerCount": workerPool.GetWorkerCount(),
 	}
 	
+	utils.Info("WorkerPool状态查询成功", map[string]string{"workerCount": strconv.Itoa(workerPool.GetWorkerCount())})
 	c.JSON(http.StatusOK, status)
 }
 
 // resizeWorkerPool 调整WorkerPool大小
 func resizeWorkerPool(c *gin.Context) {
+	utils.Info("收到WorkerPool调整请求", map[string]string{"clientIP": c.ClientIP()})
+	
 	var req struct {
 		Size int `json:"size"`
 	}
 	
 	if err := c.ShouldBindJSON(&req); err != nil {
+		utils.Warn("WorkerPool调整请求格式错误", map[string]string{"error": err.Error()})
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Invalid request format",
 		})
@@ -200,6 +234,7 @@ func resizeWorkerPool(c *gin.Context) {
 	}
 	
 	if req.Size <= 0 {
+		utils.Warn("WorkerPool调整参数错误", map[string]string{"size": strconv.Itoa(req.Size)})
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": "Size must be greater than 0",
 		})
@@ -207,6 +242,7 @@ func resizeWorkerPool(c *gin.Context) {
 	}
 	
 	workerPool.Resize(req.Size)
+	utils.Info("WorkerPool调整完成", map[string]string{"newSize": strconv.Itoa(req.Size), "workerCount": strconv.Itoa(workerPool.GetWorkerCount())})
 	
 	c.JSON(http.StatusOK, gin.H{
 		"message": "WorkerPool resized successfully",
