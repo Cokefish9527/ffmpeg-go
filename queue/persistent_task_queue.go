@@ -123,6 +123,12 @@ func (q *PersistentTaskQueue) Push(task *Task) error {
 	if task.Priority == 0 {
 		task.Priority = PriorityNormal
 	}
+	
+	// 初始化执行次数（如果是新任务）
+	if task.ExecutionCount == 0 && task.LastExecution.IsZero() {
+		task.ExecutionCount = 1
+		task.LastExecution = time.Now()
+	}
 
 	q.tasks[task.ID] = task
 
@@ -142,6 +148,13 @@ func (q *PersistentTaskQueue) Pop() (*Task, error) {
 				// 更新任务状态为处理中
 				task.Status = "processing"
 				task.Started = time.Now()
+				// 增加执行次数（除了第一次执行）
+				if task.ExecutionCount > 0 {
+					task.ExecutionCount++
+				} else {
+					task.ExecutionCount = 1
+				}
+				task.LastExecution = time.Now()
 				
 				// 保存到文件
 				if err := q.saveTasks(); err != nil {
@@ -159,6 +172,13 @@ func (q *PersistentTaskQueue) Pop() (*Task, error) {
 			// 更新任务状态为处理中
 			task.Status = "processing"
 			task.Started = time.Now()
+			// 增加执行次数（除了第一次执行）
+			if task.ExecutionCount > 0 {
+				task.ExecutionCount++
+			} else {
+				task.ExecutionCount = 1
+			}
+			task.LastExecution = time.Now()
 			
 			// 保存到文件
 			if err := q.saveTasks(); err != nil {

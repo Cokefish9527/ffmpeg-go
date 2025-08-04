@@ -242,9 +242,8 @@
                     <th>状态</th>
                     <th>优先级</th>
                     <th>创建时间</th>
-                    <th>开始时间</th>
-                    <th>完成时间</th>
-                    <th>进度</th>
+                    <th>执行次数</th>
+                    <th>最后执行</th>
                     <th>操作</th>
                 </tr>
             </thead>
@@ -325,9 +324,8 @@
                         const row = document.createElement('tr');
                         
                         // 格式化时间
-                        const created = task.created ? new Date(task.created).toLocaleString() : '-';
-                        const started = task.started ? new Date(task.started).toLocaleString() : '-';
-                        const finished = task.finished ? new Date(task.finished).toLocaleString() : '-';
+                        const createdTime = task.created ? new Date(task.created).toLocaleString() : 'N/A';
+                        const lastExecutionTime = task.lastExecution ? new Date(task.lastExecution).toLocaleString() : 'N/A';
                         
                         // 状态和优先级样式
                         const statusClass = `status-${task.status}`;
@@ -346,11 +344,10 @@
                         row.innerHTML = `
                             <td>${task.id}</td>
                             <td class="${statusClass}">${getStatusText(task.status)}</td>
-                            <td class="${priorityClass}">${getPriorityText(task.priority)}</td>
-                            <td>${created}</td>
-                            <td>${started}</td>
-                            <td>${finished}</td>
-                            <td>${(task.progress * 100).toFixed(0)}%</td>
+                            <td>${getPriorityText(task.priority)}</td>
+                            <td>${createdTime}</td>
+                            <td>${task.executionCount || 1}</td>
+                            <td>${lastExecutionTime}</td>
                             <td class="action-buttons">${actionButtons}</td>
                         `;
                         

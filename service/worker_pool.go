@@ -392,11 +392,15 @@ func (w *Worker) processNextTask() {
 					utils.Info("开始处理任务", map[string]string{
 						"taskId":   task.ID,
 						"priority": fmt.Sprintf("%d", task.Priority),
+						"executionCount": fmt.Sprintf("%d", task.ExecutionCount),
 					})
 					
 					// 更新任务状态为处理中
 					task.Status = "processing"
 					task.Started = time.Now()
+					// 更新执行次数和最后执行时间
+					task.ExecutionCount++
+					task.LastExecution = time.Now()
 					err := w.taskQueue.Update(task)
 					if err != nil {
 						utils.Error("更新任务状态失败", map[string]string{

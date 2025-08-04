@@ -1,6 +1,7 @@
 package api
 
 import (
+	"fmt"
 	"net/http"
 	"runtime"
 	"time"
@@ -264,6 +265,8 @@ func (m *MonitorAPI) RetryTask(c *gin.Context) {
 		return
 	}
 	
+	utils.Info("开始处理任务重试请求", map[string]string{"taskId": req.TaskID})
+	
 	// 获取任务
 	task, err := m.taskQueue.Get(req.TaskID)
 	if err != nil {
@@ -284,6 +287,12 @@ func (m *MonitorAPI) RetryTask(c *gin.Context) {
 		})
 		return
 	}
+	
+	utils.Info("获取到需要重试的任务", map[string]string{
+		"taskId": req.TaskID,
+		"status": task.Status,
+		"executionCount": fmt.Sprintf("%d", task.ExecutionCount),
+	})
 	
 	// 只有失败的任务才能重试
 	if task.Status != "failed" {
@@ -330,7 +339,11 @@ func (m *MonitorAPI) RetryTask(c *gin.Context) {
 		return
 	}
 	
-	utils.Info("任务重试成功", map[string]string{"taskId": req.TaskID})
+	utils.Info("任务重试成功", map[string]string{
+		"taskId": req.TaskID,
+		"executionCount": fmt.Sprintf("%d", task.ExecutionCount),
+	})
+	
 	c.JSON(http.StatusOK, gin.H{
 		"message": "Task retry successfully",
 		"taskId":  req.TaskID,

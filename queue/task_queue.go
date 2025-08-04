@@ -19,16 +19,18 @@ const (
 
 // Task 任务结构
 type Task struct {
-	ID        string        `json:"id"`
-	Status    string        `json:"status"`
-	Spec      interface{}   `json:"spec"`
-	Result    string        `json:"result"`
-	Error     string        `json:"error"`
-	Created   time.Time     `json:"created"`
-	Started   time.Time     `json:"started"`
-	Finished  time.Time     `json:"finished"`
-	Progress  float64       `json:"progress"`
-	Priority  TaskPriority  `json:"priority"` // 添加优先级字段
+	ID            string        `json:"id"`
+	Status        string        `json:"status"`
+	Spec          interface{}   `json:"spec"`
+	Result        string        `json:"result"`
+	Error         string        `json:"error"`
+	Created       time.Time     `json:"created"`
+	Started       time.Time     `json:"started"`
+	Finished      time.Time     `json:"finished"`
+	Progress      float64       `json:"progress"`
+	Priority      TaskPriority  `json:"priority"` // 添加优先级字段
+	ExecutionCount int          `json:"executionCount"` // 添加执行次数字段
+	LastExecution  time.Time    `json:"lastExecution"`  // 添加最后执行时间字段
 }
 
 // TaskQueue 任务队列接口
@@ -75,6 +77,12 @@ func (q *InMemoryTaskQueue) Push(task *Task) error {
 	// 设置默认优先级
 	if task.Priority == 0 {
 		task.Priority = PriorityNormal
+	}
+	
+	// 初始化执行次数（如果是新任务）
+	if task.ExecutionCount == 0 && task.LastExecution.IsZero() {
+		task.ExecutionCount = 1
+		task.LastExecution = time.Now()
 	}
 	
 	q.tasks[task.ID] = task
