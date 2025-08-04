@@ -35,6 +35,7 @@ type WorkerPool struct {
 	cancel     context.CancelFunc
 	wg         sync.WaitGroup
 	mutex      sync.Mutex
+	goroutinePool *utils.GoroutinePool // Goroutine池
 }
 
 // NewWorkerPool 创建新的工作池
@@ -46,17 +47,27 @@ func NewWorkerPool(maxWorkers int, taskQueue queue.TaskQueue) *WorkerPool {
 	
 	ctx, cancel := context.WithCancel(context.Background())
 	
+	// 创建Goroutine池
+	goroutinePool := utils.NewGoroutinePool(
+		utils.WithMinWorkers(int32(maxWorkers/2)),     // 最小工作线程数为配置的一半
+		utils.WithMaxWorkers(int32(maxWorkers*2)),     // 最大工作线程数为配置的两倍
+		utils.WithTaskQueueSize(10000),                // 任务队列大小
+		utils.WithWorkerTimeout(time.Minute*5),        // 工作线程超时时间
+		utils.WithTaskTimeout(time.Hour),              // 任务超时时间（视频处理可能较长）
+	)
+	
 	utils.Info("创建工作池", map[string]string{
 		"maxWorkers": fmt.Sprintf("%d", maxWorkers),
 		"cpuCount":   fmt.Sprintf("%d", runtime.NumCPU()),
 	})
 	
 	return &WorkerPool{
-		workers:    make([]*Worker, 0),
-		maxWorkers: maxWorkers,
-		taskQueue:  taskQueue,
-		ctx:        ctx,
-		cancel:     cancel,
+		workers:       make([]*Worker, 0),
+		maxWorkers:    maxWorkers,
+		taskQueue:     taskQueue,
+		ctx:           ctx,
+		cancel:        cancel,
+		goroutinePool: goroutinePool,
 	}
 }
 
@@ -65,9 +76,12 @@ func (wp *WorkerPool) Start() {
 	wp.mutex.Lock()
 	defer wp.mutex.Unlock()
 	
+	// 启动Goroutine池
+	wp.goroutinePool.Start()
+	
 	// 初始化并启动工作线程
 	for i := 0; i < wp.maxWorkers; i++ {
-		worker := NewWorker(wp.taskQueue)
+		worker := NewWorker(wp.taskQueue, wp.goroutinePool)
 		wp.workers = append(wp.workers, worker)
 		
 		wp.wg.Add(1)
@@ -94,6 +108,9 @@ func (wp *WorkerPool) Stop() {
 	// 等待所有工作线程完成
 	wp.wg.Wait()
 	
+	// 停止Goroutine池
+	wp.goroutinePool.Stop()
+	
 	utils.Info("工作池已停止", nil)
 	fmt.Println("WorkerPool stopped")
 }
@@ -117,7 +134,7 @@ func (wp *WorkerPool) Resize(newSize int) {
 	if newSize > currentSize {
 		// 增加Worker数量
 		for i := currentSize; i < newSize; i++ {
-			worker := NewWorker(wp.taskQueue)
+			worker := NewWorker(wp.taskQueue, wp.goroutinePool)
 			wp.workers = append(wp.workers, worker)
 			
 			wp.wg.Add(1)
@@ -315,17 +332,19 @@ func runFFmpegWithEncoder(encoder, listFile, outPath string, width, height, fps 
 
 // Worker 工作者结构
 type Worker struct {
-	id        int
-	taskQueue queue.TaskQueue
+	id            int
+	taskQueue     queue.TaskQueue
+	goroutinePool *utils.GoroutinePool
 }
 
 // NewWorker 创建新的工作者
-func NewWorker(taskQueue queue.TaskQueue) *Worker {
+func NewWorker(taskQueue queue.TaskQueue, goroutinePool *utils.GoroutinePool) *Worker {
 	utils.Debug("创建新的工作者", nil)
 	
 	return &Worker{
-		id:        0, // 实际项目中应该分配唯一ID
-		taskQueue: taskQueue,
+		id:            0, // 实际项目中应该分配唯一ID
+		taskQueue:     taskQueue,
+		goroutinePool: goroutinePool,
 	}
 }
 
@@ -391,8 +410,25 @@ func (w *Worker) processNextTask() {
 						return
 					}
 					
-					// 处理任务
-					w.processTask(task)
+					// 使用Goroutine池处理任务
+					err = w.goroutinePool.SubmitFunc(func() error {
+						w.processTask(task)
+						return nil
+					})
+					if err != nil {
+						utils.Error("提交任务到Goroutine池失败", map[string]string{
+							"taskId": task.ID,
+							"error":  err.Error(),
+						})
+						task.Status = "failed"
+						task.Error = fmt.Sprintf("提交任务失败: %v", err)
+						task.Finished = time.Now()
+						w.taskQueue.Update(task)
+						
+						taskMutex.Lock()
+						delete(taskBeingProcessed, task.ID)
+						taskMutex.Unlock()
+					}
 					return
 				}
 				taskMutex.Unlock()
