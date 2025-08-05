@@ -74,10 +74,10 @@ func downloadFile(url, filepath string) error {
 }
 
 var (
-	taskQueue     queue.TaskQueue         // 使用queue包中的TaskQueue接口
-	editorService service.VideoEditor     // 视频编辑服务
-	workerPool    *service.WorkerPool     // 工作池
-	monitorAPI    *api.MonitorAPI         // 监控API
+	taskQueue     queue.TaskQueue     // 使用queue包中的TaskQueue接口
+	editorService service.VideoEditor // 视频编辑服务
+	workerPool    *service.WorkerPool // 工作池
+	monitorAPI    *api.MonitorAPI     // 监控API
 )
 
 // loadTasksFromFile 从文件加载任务
@@ -118,10 +118,10 @@ func main() {
 	// 初始化全局日志记录器
 	utils.InitGlobalLogger()
 	utils.Info("服务启动中", map[string]string{"phase": "initialization"})
-	
+
 	// 设置Gin运行模式
 	gin.SetMode(gin.ReleaseMode)
-	
+
 	// 初始化任务队列 (使用持久化任务队列)
 	var err error
 	taskQueue, err = queue.NewPersistentTaskQueue("./data")
@@ -135,7 +135,7 @@ func main() {
 	if maxWorkers <= 0 {
 		maxWorkers = 12 // 默认12个工作者
 	}
-	
+
 	workerPool = service.NewWorkerPool(maxWorkers, taskQueue)
 	utils.Info("工作池初始化完成", map[string]string{"maxWorkers": strconv.Itoa(maxWorkers)})
 
@@ -148,8 +148,13 @@ func main() {
 	utils.Info("监控API初始化完成", nil)
 
 	// 创建Gin引擎
-	r := gin.New()
-	
+	r := gin.Default()
+
+	// 静态资源路由，暴露web目录
+	r.Static("/web", "./web")
+	// Swagger UI路由，暴露swagger目录
+	r.Static("/swagger", "./web/swagger")
+
 	// 添加日志中间件
 	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
 		return fmt.Sprintf("[GIN] %s | %3d | %13v | %15s | %-7s %s\n",
@@ -296,7 +301,7 @@ func main() {
 
 			// 生成临时文件名
 			filename := fmt.Sprintf("%s/%s_temp.mp4", tempDir, taskID)
-			
+
 			// 下载文件
 			err := downloadFile(req.URL, filename)
 			if err != nil {
@@ -310,7 +315,7 @@ func main() {
 
 			// 创建任务对象，与素材预处理器兼容
 			task := &queue.Task{
-				ID:   taskID,
+				ID: taskID,
 				Spec: map[string]interface{}{
 					"source":   filename,
 					"taskType": "materialPreprocess",
@@ -348,7 +353,7 @@ func main() {
 					if err != nil {
 						absPath = task.Result // 如果获取失败，使用原始路径
 					}
-					
+
 					c.JSON(http.StatusOK, VideoURLResponse{
 						Status:     "success",
 						Message:    "Video converted successfully",
@@ -382,28 +387,28 @@ func main() {
 	{
 		// 系统统计信息
 		monitorGroup.GET("/stats", monitorAPI.GetSystemStats)
-		
+
 		// 任务统计信息
 		monitorGroup.GET("/tasks/stats", monitorAPI.GetTaskStats)
-		
+
 		// 任务列表
 		monitorGroup.GET("/tasks", monitorAPI.GetTasks)
-		
+
 		// 任务详情
 		monitorGroup.GET("/tasks/:taskId", monitorAPI.GetTaskDetail)
-		
+
 		// Worker统计信息
 		monitorGroup.GET("/workers", monitorAPI.GetWorkerStats)
-		
+
 		// 重试任务
 		monitorGroup.POST("/tasks/retry", monitorAPI.RetryTask)
-		
+
 		// 取消任务
 		monitorGroup.POST("/tasks/cancel", monitorAPI.CancelTask)
-		
+
 		// 丢弃任务
 		monitorGroup.POST("/tasks/discard", monitorAPI.DiscardTask)
-		
+
 		// 任务执行历史
 		monitorGroup.GET("/tasks/:taskId/executions", monitorAPI.GetTaskExecutions)
 	}
@@ -420,9 +425,9 @@ func main() {
 	if port == "" {
 		port = "8082" // 默认端口改为8082
 	}
-	
+
 	utils.Info("服务器启动中", map[string]string{"port": port})
-	
+
 	srv := &http.Server{
 		Addr:    ":" + port,
 		Handler: r,
