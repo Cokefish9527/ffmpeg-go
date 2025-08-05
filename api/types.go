@@ -63,3 +63,31 @@ type TaskStatusResponse struct {
 	// Priority 任务优先级
 	Priority  service.TaskPriority `json:"priority,omitempty"`   // 任务优先级
 }
+
+// MaterialUploadResponse 素材上传响应结构体
+type MaterialUploadResponse struct {
+	// TaskID 任务ID，用于标识和查询转换任务状态
+	TaskID    string `json:"taskId"`
+	// Status 任务状态
+	Status    string `json:"status"`
+	// Message 响应消息
+	Message   string `json:"message"`
+}
+
+// VideoURLRequest 视频URL请求结构体
+type VideoURLRequest struct {
+	// URL 视频文件的URL地址
+	URL string `json:"url"`
+}
+
+// VideoURLResponse 视频URL响应结构体
+type VideoURLResponse struct {
+	// Status 处理状态
+	Status string `json:"status"`
+	// Message 响应消息
+	Message string `json:"message"`
+	// TSFilePath 转换后的TS文件本地路径
+	TSFilePath string `json:"tsFilePath,omitempty"`
+	// Error 错误信息（如果有）
+	Error string `json:"error,omitempty"`
+}

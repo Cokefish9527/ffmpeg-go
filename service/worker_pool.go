@@ -426,6 +426,56 @@ func (w *Worker) processTask(task *queue.Task) {
 		return
 	}
 
+	// 检查任务类型
+	taskType := "videoEdit" // 默认任务类型
+	if taskTypeVal, exists := spec["taskType"]; exists {
+		if str, ok := taskTypeVal.(string); ok {
+			taskType = str
+		}
+	}
+
+	// 根据任务类型处理任务
+	switch taskType {
+	case "materialPreprocess":
+		// 处理素材预处理任务
+		w.processMaterialPreprocessTask(task, spec)
+	default:
+		// 处理视频编辑任务（原有逻辑）
+		w.processVideoEditTask(task, spec)
+	}
+}
+
+// processMaterialPreprocessTask 处理素材预处理任务
+func (w *Worker) processMaterialPreprocessTask(task *queue.Task, spec map[string]interface{}) {
+	utils.Info("开始处理素材预处理任务", map[string]string{"taskId": task.ID})
+	
+	// 创建素材预处理器服务
+	materialPreprocessor := NewMaterialPreprocessorService()
+	
+	// 处理任务
+	err := materialPreprocessor.Process(task)
+	if err != nil {
+		task.Status = "failed"
+		task.Error = err.Error()
+		task.Finished = time.Now()
+		w.taskQueue.Update(task)
+		
+		utils.Error("素材预处理任务失败", map[string]string{
+			"taskId": task.ID,
+			"error":  err.Error(),
+		})
+		return
+	}
+	
+	// 任务成功完成，状态已经在Process方法中更新
+	task.Finished = time.Now()
+	w.taskQueue.Update(task)
+	
+	utils.Info("素材预处理任务完成", map[string]string{"taskId": task.ID})
+}
+
+// processVideoEditTask 处理视频编辑任务
+func (w *Worker) processVideoEditTask(task *queue.Task, spec map[string]interface{}) {
 	// 简化处理，实际项目中应该使用更完善的解析方法
 	outPath := ""
 	if outPathVal, exists := spec["outPath"]; exists {
