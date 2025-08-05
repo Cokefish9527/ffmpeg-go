@@ -2,3 +2,6 @@
 /video
 /main.exe
 /temp
+/release
+/ffmpeg-go-linux
+/ffmpeg-go-linux.tar.gz
