@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"syscall"
 	"time"
@@ -342,10 +343,16 @@ func main() {
 				}
 
 				if task.Status == "completed" {
+					// 获取完整路径
+					absPath, err := filepath.Abs(task.Result)
+					if err != nil {
+						absPath = task.Result // 如果获取失败，使用原始路径
+					}
+					
 					c.JSON(http.StatusOK, VideoURLResponse{
 						Status:     "success",
 						Message:    "Video converted successfully",
-						TSFilePath: task.Result,
+						TSFilePath: absPath,
 					})
 					return
 				}
