@@ -6,6 +6,7 @@
 
 # 忽略构建产物
 *.exe
+ffmpeg-go
 ffmpeg-go-linux
 ffmpeg-go-linux.tar.gz
 release/
@@ -19,6 +20,9 @@ temp/
 
 # 忽略数据目录（如果不需要持久化）
 # data/
+
+# 忽略本地ffmpeg-go目录
+ffmpeg-go/
 
 # 忽略测试文件
 *_test.go
