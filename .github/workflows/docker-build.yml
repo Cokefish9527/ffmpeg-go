@@ -3,10 +3,16 @@ name: Build and Push Docker Image
 on:
   push:
     branches:
-      - main
+      - master
+    paths-ignore:
+      - 'Dockerfile'
+      - '.github/workflows/docker-lint.yml'
   pull_request:
     branches:
-      - main
+      - master
+    paths-ignore:
+      - 'Dockerfile'
+      - '.github/workflows/docker-lint.yml'
 
 jobs:
   build:

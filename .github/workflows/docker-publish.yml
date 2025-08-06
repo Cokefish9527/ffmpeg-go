@@ -3,7 +3,7 @@ name: Publish Docker Image
 on:
   push:
     branches:
-      - main
+      - master
     tags:
       - 'v*'
 
@@ -25,13 +25,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v4
         with:
-          images: | 
-            ${DOCKERHUB_USERNAME}/ffmpeg-go
-          tags: |
-            type=ref,event=branch
-            type=ref,event=pr
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
+          images: cokefish9527/ffmpeg-go
 
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
