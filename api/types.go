@@ -78,6 +78,8 @@ type MaterialUploadResponse struct {
 type VideoURLRequest struct {
 	// URL 视频文件的URL地址
 	URL string `json:"url"`
+	// Callback 转换完成后的回调URL，用于通知调用方提取转换后的TS文件
+	Callback string `json:"callback,omitempty"`
 }
 
 // VideoURLResponse 视频URL响应结构体

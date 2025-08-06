@@ -2,9 +2,12 @@ package service
 
 import (
 	"fmt"
+	"net/http"
 	"os"
 	"path/filepath"
-
+	"bytes"
+	"encoding/json"
+	
 	ffmpeg_go "github.com/u2takey/ffmpeg-go"
 	"github.com/u2takey/ffmpeg-go/queue"
 )
@@ -12,6 +15,14 @@ import (
 // MaterialPreprocessor 素材预处理器接口
 type MaterialPreprocessor interface {
 	Process(task *queue.Task) error
+}
+
+// CallbackRequest 回调请求结构
+type CallbackRequest struct {
+	TaskID   string `json:"taskId"`
+	Status   string `json:"status"`
+	Result   string `json:"result,omitempty"`
+	Error    string `json:"error,omitempty"`
 }
 
 // MaterialPreprocessorService 素材预处理器服务
@@ -32,16 +43,21 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	// 从任务规范中获取源文件路径
 	spec, ok := task.Spec.(map[string]interface{})
 	if !ok {
-		return fmt.Errorf("invalid task spec format")
+		err := fmt.Errorf("invalid task spec format")
+		s.sendCallback(task, "failed", "", err.Error())
+		return err
 	}
 
 	source, ok := spec["source"].(string)
 	if !ok {
-		return fmt.Errorf("missing source file in task spec")
+		err := fmt.Errorf("missing source file in task spec")
+		s.sendCallback(task, "failed", "", err.Error())
+		return err
 	}
 
 	// 检查源文件是否存在
 	if _, err := os.Stat(source); os.IsNotExist(err) {
+		s.sendCallback(task, "failed", "", err.Error())
 		return fmt.Errorf("source file does not exist: %s", source)
 	}
 
@@ -54,6 +70,7 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	if err != nil {
 		task.Status = "failed"
 		task.Error = err.Error()
+		s.sendCallback(task, "failed", "", err.Error())
 		return err
 	}
 
@@ -61,6 +78,8 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	task.Status = "completed"
 	task.Progress = 1.0
 	task.Result = outputFile
+	
+	s.sendCallback(task, "completed", outputFile, "")
 
 	return nil
 }
@@ -75,4 +94,43 @@ func (s *MaterialPreprocessorService) convertToTS(inputFile, outputFile string) 
 		}).
 		OverWriteOutput().
 		Run()
+}
+
+// sendCallback 发送回调通知
+func (s *MaterialPreprocessorService) sendCallback(task *queue.Task, status, result, errorMsg string) {
+	// 从任务规范中获取回调URL
+	spec, ok := task.Spec.(map[string]interface{})
+	if !ok {
+		return
+	}
+
+	callbackURL, ok := spec["callback"].(string)
+	if !ok || callbackURL == "" {
+		// 没有回调URL，直接返回
+		return
+	}
+
+	// 构造回调请求
+	callbackReq := CallbackRequest{
+		TaskID: task.ID,
+		Status: status,
+		Result: result,
+		Error:  errorMsg,
+	}
+
+	// 序列化请求体
+	jsonData, err := json.Marshal(callbackReq)
+	if err != nil {
+		return
+	}
+
+	// 发送POST请求
+	resp, err := http.Post(callbackURL, "application/json", bytes.NewBuffer(jsonData))
+	if err != nil {
+		return
+	}
+	defer resp.Body.Close()
+	
+	// 可以根据需要处理响应，这里简单地忽略
+	_ = resp
 }

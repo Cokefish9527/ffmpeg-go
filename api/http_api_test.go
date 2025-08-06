@@ -198,6 +198,7 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 					"source":   filename,
 					"output":   outputFile,
 					"taskType": "materialPreprocess",
+					"callback": req.Callback, // 添加回调URL到任务规范中
 				},
 				Status:   "pending",
 				Created:  time.Now(),
@@ -210,6 +211,17 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 					Status: "error",
 					Message: "Failed to add task to queue",
 					Error:  err.Error(),
+				})
+				return
+			}
+
+			// 如果提供了回调URL，则异步处理任务
+			if req.Callback != "" {
+				// 不等待任务完成，直接返回接受响应
+				c.JSON(http.StatusAccepted, VideoURLResponse{
+					Status:  "accepted",
+					Message: "Video conversion task accepted, you will be notified via callback when it's completed",
+					TSFilePath: outputFile,
 				})
 				return
 			}
