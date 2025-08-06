@@ -19,6 +19,8 @@ import (
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
 	"github.com/u2takey/ffmpeg-go/utils"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 // TaskStatusResponse 任务状态响应
@@ -153,7 +155,7 @@ func main() {
 	// 静态资源路由，暴露web目录
 	r.Static("/web", "./web")
 	// Swagger UI路由，暴露swagger目录
-	r.Static("/swagger", "./web/swagger")
+	r.Static("/swagger", "./web/swagger/dist")
 
 	// 添加日志中间件
 	r.Use(gin.LoggerWithFormatter(func(param gin.LogFormatterParams) string {
@@ -178,6 +180,12 @@ func main() {
 	// API路由组
 	apiGroup := r.Group("/api/v1")
 	{
+		// Swagger 文档路由
+		apiGroup.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+		// 修复路由冲突问题，将具体的doc.json和doc.yaml路径移到不同的前缀下
+		r.StaticFile("/api/v1/swagger-doc/doc.json", "./docs/swagger.json")
+		r.StaticFile("/api/v1/swagger-doc/doc.yaml", "./docs/swagger.yaml")
+		
 		// 视频编辑相关接口
 		apiGroup.POST("/video/edit", func(c *gin.Context) {
 			var req api.VideoEditRequest

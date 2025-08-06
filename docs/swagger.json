@@ -1,0 +1,568 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "This is a video editing service API server.",
+    "title": "Video Editing Service API",
+    "termsOfService": "http://swagger.io/terms/",
+    "contact": {
+      "name": "API Support",
+      "url": "http://www.swagger.io/support",
+      "email": "support@swagger.io"
+    },
+    "license": {
+      "name": "Apache 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.html"
+    },
+    "version": "1.0"
+  },
+  "host": "localhost:8082",
+  "basePath": "/api/v1",
+  "paths": {
+    "/video/edit": {
+      "post": {
+        "description": "Submit a video editing task",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "video"
+        ],
+        "summary": "Submit video editing task",
+        "parameters": [
+          {
+            "description": "Video edit request",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/api.VideoEditRequest"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "description": "Task accepted for processing",
+            "schema": {
+              "$ref": "#/definitions/api.VideoEditResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request format",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to submit task",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/edit/{taskId}": {
+      "get": {
+        "description": "Get the status of a video editing task",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "video"
+        ],
+        "summary": "Get task status",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Task ID",
+            "name": "taskId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task status",
+            "schema": {
+              "$ref": "#/definitions/TaskStatusResponse"
+            }
+          },
+          "404": {
+            "description": "Task not found",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to get task status",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "delete": {
+        "description": "Cancel a video editing task",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "video"
+        ],
+        "summary": "Cancel task",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Task ID",
+            "name": "taskId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task cancelled successfully",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "Failed to cancel task",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "error": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/video/url": {
+      "post": {
+        "description": "Process video from URL",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "video"
+        ],
+        "summary": "Process video URL",
+        "parameters": [
+          {
+            "description": "Video URL request",
+            "name": "request",
+            "in": "body",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/VideoURLRequest"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Video converted successfully",
+            "schema": {
+              "$ref": "#/definitions/VideoURLResponse"
+            }
+          },
+          "400": {
+            "description": "Invalid request format",
+            "schema": {
+              "$ref": "#/definitions/VideoURLResponse"
+            }
+          },
+          "500": {
+            "description": "Failed to process video",
+            "schema": {
+              "$ref": "#/definitions/VideoURLResponse"
+            }
+          }
+        }
+      }
+    },
+    "/monitor/stats": {
+      "get": {
+        "description": "Get system statistics",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "monitor"
+        ],
+        "summary": "Get system stats",
+        "responses": {
+          "200": {
+            "description": "System statistics",
+            "schema": {
+              "$ref": "#/definitions/api.SystemStats"
+            }
+          }
+        }
+      }
+    },
+    "/monitor/tasks/stats": {
+      "get": {
+        "description": "Get task statistics",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "monitor"
+        ],
+        "summary": "Get task stats",
+        "responses": {
+          "200": {
+            "description": "Task statistics",
+            "schema": {
+              "$ref": "#/definitions/api.TaskStats"
+            }
+          }
+        }
+      }
+    },
+    "/monitor/tasks": {
+      "get": {
+        "description": "Get tasks list",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "monitor"
+        ],
+        "summary": "Get tasks",
+        "responses": {
+          "200": {
+            "description": "Tasks list",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/queue.Task"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/monitor/tasks/{taskId}": {
+      "get": {
+        "description": "Get task detail",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "monitor"
+        ],
+        "summary": "Get task detail",
+        "parameters": [
+          {
+            "type": "string",
+            "description": "Task ID",
+            "name": "taskId",
+            "in": "path",
+            "required": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Task detail",
+            "schema": {
+              "$ref": "#/definitions/queue.Task"
+            }
+          }
+        }
+      }
+    },
+    "/monitor/workers": {
+      "get": {
+        "description": "Get worker statistics",
+        "consumes": [
+          "application/json"
+        ],
+        "produces": [
+          "application/json"
+        ],
+        "tags": [
+          "monitor"
+        ],
+        "summary": "Get worker stats",
+        "responses": {
+          "200": {
+            "description": "Worker statistics",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "workerCount": {
+                  "type": "integer"
+                },
+                "activeWorkers": {
+                  "type": "integer"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "definitions": {
+    "api.OSSOutput": {
+      "type": "object",
+      "properties": {
+        "accessKey": {
+          "type": "string"
+        },
+        "bucket": {
+          "type": "string"
+        },
+        "endpoint": {
+          "type": "string"
+        },
+        "key": {
+          "type": "string"
+        },
+        "secretKey": {
+          "type": "string"
+        }
+      }
+    },
+    "api.SystemStats": {
+      "type": "object",
+      "properties": {
+        "activeWorkers": {
+          "type": "integer"
+        },
+        "cpuUsage": {
+          "type": "number"
+        },
+        "diskTotal": {
+          "type": "integer"
+        },
+        "diskUsage": {
+          "type": "number"
+        },
+        "diskUsed": {
+          "type": "integer"
+        },
+        "goroutines": {
+          "type": "integer"
+        },
+        "memoryTotal": {
+          "type": "integer"
+        },
+        "memoryUsage": {
+          "type": "number"
+        },
+        "memoryUsed": {
+          "type": "integer"
+        },
+        "taskQueueSize": {
+          "type": "integer"
+        },
+        "timestamp": {
+          "type": "string"
+        },
+        "workerCount": {
+          "type": "integer"
+        }
+      }
+    },
+    "api.TaskStats": {
+      "type": "object",
+      "properties": {
+        "completedTasks": {
+          "type": "integer"
+        },
+        "failedTasks": {
+          "type": "integer"
+        },
+        "pendingTasks": {
+          "type": "integer"
+        },
+        "processingTasks": {
+          "type": "integer"
+        },
+        "totalTasks": {
+          "type": "integer"
+        }
+      }
+    },
+    "api.TaskStatusResponse": {
+      "type": "object",
+      "properties": {
+        "created": {
+          "type": "string"
+        },
+        "finished": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "outputUrl": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "progress": {
+          "type": "number"
+        },
+        "started": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        }
+      }
+    },
+    "api.VideoEditRequest": {
+      "type": "object",
+      "properties": {
+        "ossOutput": {
+          "$ref": "#/definitions/api.OSSOutput"
+        },
+        "outputPath": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "spec": {
+          "type": "object"
+        }
+      }
+    },
+    "api.VideoEditResponse": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "outputUrl": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "taskId": {
+          "type": "string"
+        }
+      }
+    },
+    "api.VideoURLRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string"
+        }
+      }
+    },
+    "api.VideoURLResponse": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "string"
+        },
+        "message": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "tsFilePath": {
+          "type": "string"
+        }
+      }
+    },
+    "queue.Task": {
+      "type": "object",
+      "properties": {
+        "created": {
+          "type": "string"
+        },
+        "error": {
+          "type": "string"
+        },
+        "finished": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "priority": {
+          "type": "integer"
+        },
+        "progress": {
+          "type": "number"
+        },
+        "result": {
+          "type": "string"
+        },
+        "spec": {
+          "type": "object"
+        },
+        "started": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

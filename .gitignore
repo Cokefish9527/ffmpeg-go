@@ -5,3 +5,5 @@
 /release
 /ffmpeg-go-linux
 /ffmpeg-go-linux.tar.gz
+ffmpeg-service
+service/worker_pool.go.bak
