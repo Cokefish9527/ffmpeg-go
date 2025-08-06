@@ -17,29 +17,6 @@
     "lastExecution": "2025-08-05T16:54:50.4064422+08:00"
   },
   {
-    "id": "d955f82d-9bd2-467c-91bb-3cf292e74734",
-    "status": "failed",
-    "spec": {
-      "inputs": [
-        {
-          "source": "../examples/sample_data/in1.mp4"
-        }
-      ],
-      "output": {
-        "filename": "../examples/sample_data/output_test.mp4"
-      }
-    },
-    "result": "",
-    "error": "缺少必要的视频编辑参数",
-    "created": "2025-08-04T17:24:37.4774765+08:00",
-    "started": "2025-08-04T21:30:57.4762659+08:00",
-    "finished": "2025-08-04T21:30:57.4762659+08:00",
-    "progress": 0,
-    "priority": 1,
-    "executionCount": 6,
-    "lastExecution": "2025-08-04T21:30:57.4762659+08:00"
-  },
-  {
     "id": "6f7fe6a3-2755-474b-b365-2cac737f3bc2",
     "status": "failed",
     "spec": {
@@ -86,40 +63,6 @@
     "lastExecution": "2025-08-04T21:31:17.4787097+08:00"
   },
   {
-    "id": "2365cee1-b18d-47f8-af83-8d438e87f396",
-    "status": "failed",
-    "spec": {
-      "source": "./temp/2365cee1-b18d-47f8-af83-8d438e87f396_temp.mp4",
-      "taskType": "materialPreprocess"
-    },
-    "result": "",
-    "error": "缺少必要的视频编辑参数",
-    "created": "2025-08-05T16:44:21.1314545+08:00",
-    "started": "2025-08-05T16:44:21.2158498+08:00",
-    "finished": "2025-08-05T16:44:21.2158498+08:00",
-    "progress": 0,
-    "priority": 1,
-    "executionCount": 2,
-    "lastExecution": "2025-08-05T16:44:21.2158498+08:00"
-  },
-  {
-    "id": "f11c7789-7eb2-4afa-ace6-ec1dd62d5c3a",
-    "status": "completed",
-    "spec": {
-      "source": "./temp/f11c7789-7eb2-4afa-ace6-ec1dd62d5c3a_temp.mp4",
-      "taskType": "materialPreprocess"
-    },
-    "result": "./temp/f11c7789-7eb2-4afa-ace6-ec1dd62d5c3a_temp.ts",
-    "error": "",
-    "created": "2025-08-05T16:47:28.6618795+08:00",
-    "started": "2025-08-05T16:47:28.7294977+08:00",
-    "finished": "2025-08-05T16:47:28.8726621+08:00",
-    "progress": 1,
-    "priority": 1,
-    "executionCount": 2,
-    "lastExecution": "2025-08-05T16:47:28.7294977+08:00"
-  },
-  {
     "id": "f325c1ca-b75e-4c54-b994-2badb9701b83",
     "status": "completed",
     "spec": {
@@ -154,24 +97,6 @@
     "lastExecution": "2025-08-05T16:55:13.3350079+08:00"
   },
   {
-    "id": "4c90e1f4-074b-4bdb-b7c5-77aabca763d0",
-    "status": "failed",
-    "spec": {
-      "output": "./temp/4c90e1f4-074b-4bdb-b7c5-77aabca763d0_temp.ts",
-      "source": "./temp/4c90e1f4-074b-4bdb-b7c5-77aabca763d0_temp.mp4",
-      "taskType": "materialPreprocess"
-    },
-    "result": "",
-    "error": "缺少必要的视频编辑参数",
-    "created": "2025-08-05T16:31:07.7361001+08:00",
-    "started": "2025-08-05T16:31:07.8223762+08:00",
-    "finished": "2025-08-05T16:31:07.8223762+08:00",
-    "progress": 0,
-    "priority": 1,
-    "executionCount": 2,
-    "lastExecution": "2025-08-05T16:31:07.8223762+08:00"
-  },
-  {
     "id": "bd3bfe11-1977-4258-bda1-4d84a5f05616",
     "status": "failed",
     "spec": {
@@ -195,6 +120,41 @@
     "lastExecution": "2025-08-04T21:29:34.4737634+08:00"
   },
   {
+    "id": "2365cee1-b18d-47f8-af83-8d438e87f396",
+    "status": "failed",
+    "spec": {
+      "source": "./temp/2365cee1-b18d-47f8-af83-8d438e87f396_temp.mp4",
+      "taskType": "materialPreprocess"
+    },
+    "result": "",
+    "error": "缺少必要的视频编辑参数",
+    "created": "2025-08-05T16:44:21.1314545+08:00",
+    "started": "2025-08-05T16:44:21.2158498+08:00",
+    "finished": "2025-08-05T16:44:21.2158498+08:00",
+    "progress": 0,
+    "priority": 1,
+    "executionCount": 2,
+    "lastExecution": "2025-08-05T16:44:21.2158498+08:00"
+  },
+  {
+    "id": "4c90e1f4-074b-4bdb-b7c5-77aabca763d0",
+    "status": "failed",
+    "spec": {
+      "output": "./temp/4c90e1f4-074b-4bdb-b7c5-77aabca763d0_temp.ts",
+      "source": "./temp/4c90e1f4-074b-4bdb-b7c5-77aabca763d0_temp.mp4",
+      "taskType": "materialPreprocess"
+    },
+    "result": "",
+    "error": "缺少必要的视频编辑参数",
+    "created": "2025-08-05T16:31:07.7361001+08:00",
+    "started": "2025-08-05T16:31:07.8223762+08:00",
+    "finished": "2025-08-05T16:31:07.8223762+08:00",
+    "progress": 0,
+    "priority": 1,
+    "executionCount": 2,
+    "lastExecution": "2025-08-05T16:31:07.8223762+08:00"
+  },
+  {
     "id": "3b89b725-7885-48bf-b313-55cbcd13817a",
     "status": "completed",
     "spec": {
@@ -210,5 +170,45 @@
     "priority": 1,
     "executionCount": 2,
     "lastExecution": "2025-08-05T16:58:47.7568109+08:00"
+  },
+  {
+    "id": "d955f82d-9bd2-467c-91bb-3cf292e74734",
+    "status": "failed",
+    "spec": {
+      "inputs": [
+        {
+          "source": "../examples/sample_data/in1.mp4"
+        }
+      ],
+      "output": {
+        "filename": "../examples/sample_data/output_test.mp4"
+      }
+    },
+    "result": "",
+    "error": "缺少必要的视频编辑参数",
+    "created": "2025-08-04T17:24:37.4774765+08:00",
+    "started": "2025-08-04T21:30:57.4762659+08:00",
+    "finished": "2025-08-04T21:30:57.4762659+08:00",
+    "progress": 0,
+    "priority": 1,
+    "executionCount": 6,
+    "lastExecution": "2025-08-04T21:30:57.4762659+08:00"
+  },
+  {
+    "id": "f11c7789-7eb2-4afa-ace6-ec1dd62d5c3a",
+    "status": "completed",
+    "spec": {
+      "source": "./temp/f11c7789-7eb2-4afa-ace6-ec1dd62d5c3a_temp.mp4",
+      "taskType": "materialPreprocess"
+    },
+    "result": "./temp/f11c7789-7eb2-4afa-ace6-ec1dd62d5c3a_temp.ts",
+    "error": "",
+    "created": "2025-08-05T16:47:28.6618795+08:00",
+    "started": "2025-08-05T16:47:28.7294977+08:00",
+    "finished": "2025-08-05T16:47:28.8726621+08:00",
+    "progress": 1,
+    "priority": 1,
+    "executionCount": 2,
+    "lastExecution": "2025-08-05T16:47:28.7294977+08:00"
   }
 ]

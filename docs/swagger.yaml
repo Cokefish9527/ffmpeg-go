@@ -289,26 +289,42 @@ definitions:
         type: "integer"
       totalTasks:
         type: "integer"
-  api.TaskStatusResponse:
+  TaskStatusResponse:
     type: "object"
     properties:
+      taskId:
+        type: "string"
+      status:
+        type: "string"
+      progress:
+        type: "number"
+      message:
+        type: "string"
       created:
         type: "string"
-      finished:
+      started:
         type: "string"
-      message:
+      finished:
         type: "string"
       outputUrl:
         type: "string"
       priority:
         type: "integer"
-      progress:
-        type: "number"
-      started:
+  VideoURLRequest:
+    type: "object"
+    properties:
+      url:
         type: "string"
+  VideoURLResponse:
+    type: "object"
+    properties:
       status:
         type: "string"
-      taskId:
+      message:
+        type: "string"
+      tsFilePath:
+        type: "string"
+      error:
         type: "string"
   api.VideoEditRequest:
     type: "object"
@@ -331,22 +347,6 @@ definitions:
       status:
         type: "string"
       taskId:
-        type: "string"
-  api.VideoURLRequest:
-    type: "object"
-    properties:
-      url:
-        type: "string"
-  api.VideoURLResponse:
-    type: "object"
-    properties:
-      error:
-        type: "string"
-      message:
-        type: "string"
-      status:
-        type: "string"
-      tsFilePath:
         type: "string"
   queue.Task:
     type: "object"
