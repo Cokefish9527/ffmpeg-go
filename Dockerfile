@@ -1,6 +1,11 @@
 # 使用官方Golang镜像作为构建阶段的基础镜像
 FROM golang:1.22-alpine AS builder
 
+# 设置构建参数
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
+
 # 设置工作目录
 WORKDIR /app
 
@@ -8,13 +13,13 @@ WORKDIR /app
 COPY go.mod go.sum ./
 
 # 下载依赖
-RUN go mod download
+RUN go mod download && go mod verify
 
 # 复制源代码
 COPY . .
 
 # 构建应用
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ffmpeg-go cmd/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -a -installsuffix cgo -o ffmpeg-go cmd/main.go
 
 # 使用轻量级Alpine镜像作为运行时基础镜像
 FROM alpine:latest
@@ -44,11 +49,7 @@ RUN chown -R appuser:appuser /app
 USER appuser
 
 # 暴露端口
-EXPOSE 8082
-
-# 设置环境变量
-ENV PORT=8082
-ENV MAX_WORKERS=4
+EXPOSE 8080
 
 # 启动应用
 CMD ["./ffmpeg-go"]
