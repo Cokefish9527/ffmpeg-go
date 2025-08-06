@@ -7,3 +7,4 @@
 /ffmpeg-go-linux.tar.gz
 ffmpeg-service
 service/worker_pool.go.bak
+data/tasks.json

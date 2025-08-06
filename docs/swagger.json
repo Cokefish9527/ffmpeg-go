@@ -55,7 +55,8 @@
               "type": "object",
               "properties": {
                 "error": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "错误信息"
                 }
               }
             }
@@ -66,7 +67,8 @@
               "type": "object",
               "properties": {
                 "error": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "错误信息"
                 }
               }
             }
@@ -109,7 +111,8 @@
               "type": "object",
               "properties": {
                 "error": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "错误信息"
                 }
               }
             }
@@ -120,7 +123,8 @@
               "type": "object",
               "properties": {
                 "error": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "错误信息"
                 }
               }
             }
@@ -155,7 +159,8 @@
               "type": "object",
               "properties": {
                 "message": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "返回消息"
                 }
               }
             }
@@ -166,7 +171,8 @@
               "type": "object",
               "properties": {
                 "error": {
-                  "type": "string"
+                  "type": "string",
+                  "description": "错误信息"
                 }
               }
             }
@@ -344,10 +350,12 @@
               "type": "object",
               "properties": {
                 "workerCount": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "工作进程总数"
                 },
                 "activeWorkers": {
-                  "type": "integer"
+                  "type": "integer",
+                  "description": "活跃工作进程数"
                 }
               }
             }
@@ -361,19 +369,24 @@
       "type": "object",
       "properties": {
         "accessKey": {
-          "type": "string"
+          "type": "string",
+          "description": "OSS访问密钥"
         },
         "bucket": {
-          "type": "string"
+          "type": "string",
+          "description": "OSS存储桶名称"
         },
         "endpoint": {
-          "type": "string"
+          "type": "string",
+          "description": "OSS终端节点"
         },
         "key": {
-          "type": "string"
+          "type": "string",
+          "description": "OSS对象键"
         },
         "secretKey": {
-          "type": "string"
+          "type": "string",
+          "description": "OSS密钥"
         }
       }
     },
@@ -381,40 +394,52 @@
       "type": "object",
       "properties": {
         "activeWorkers": {
-          "type": "integer"
+          "type": "integer",
+          "description": "活跃工作进程数"
         },
         "cpuUsage": {
-          "type": "number"
+          "type": "number",
+          "description": "CPU使用率"
         },
         "diskTotal": {
-          "type": "integer"
+          "type": "integer",
+          "description": "磁盘总容量(字节)"
         },
         "diskUsage": {
-          "type": "number"
+          "type": "number",
+          "description": "磁盘使用率"
         },
         "diskUsed": {
-          "type": "integer"
+          "type": "integer",
+          "description": "已使用磁盘空间(字节)"
         },
         "goroutines": {
-          "type": "integer"
+          "type": "integer",
+          "description": "Goroutines数量"
         },
         "memoryTotal": {
-          "type": "integer"
+          "type": "integer",
+          "description": "内存总容量(字节)"
         },
         "memoryUsage": {
-          "type": "number"
+          "type": "number",
+          "description": "内存使用率"
         },
         "memoryUsed": {
-          "type": "integer"
+          "type": "integer",
+          "description": "已使用内存(字节)"
         },
         "taskQueueSize": {
-          "type": "integer"
+          "type": "integer",
+          "description": "任务队列大小"
         },
         "timestamp": {
-          "type": "string"
+          "type": "string",
+          "description": "时间戳"
         },
         "workerCount": {
-          "type": "integer"
+          "type": "integer",
+          "description": "工作进程总数"
         }
       }
     },
@@ -422,19 +447,24 @@
       "type": "object",
       "properties": {
         "completedTasks": {
-          "type": "integer"
+          "type": "integer",
+          "description": "已完成任务数"
         },
         "failedTasks": {
-          "type": "integer"
+          "type": "integer",
+          "description": "失败任务数"
         },
         "pendingTasks": {
-          "type": "integer"
+          "type": "integer",
+          "description": "待处理任务数"
         },
         "processingTasks": {
-          "type": "integer"
+          "type": "integer",
+          "description": "正在处理任务数"
         },
         "totalTasks": {
-          "type": "integer"
+          "type": "integer",
+          "description": "总任务数"
         }
       }
     },
@@ -442,31 +472,40 @@
       "type": "object",
       "properties": {
         "taskId": {
-          "type": "string"
+          "type": "string",
+          "description": "任务ID"
         },
         "status": {
-          "type": "string"
+          "type": "string",
+          "description": "任务状态"
         },
         "progress": {
-          "type": "number"
+          "type": "number",
+          "description": "任务进度(0-1)"
         },
         "message": {
-          "type": "string"
+          "type": "string",
+          "description": "任务消息"
         },
         "created": {
-          "type": "string"
+          "type": "string",
+          "description": "任务创建时间"
         },
         "started": {
-          "type": "string"
+          "type": "string",
+          "description": "任务开始时间"
         },
         "finished": {
-          "type": "string"
+          "type": "string",
+          "description": "任务完成时间"
         },
         "outputUrl": {
-          "type": "string"
+          "type": "string",
+          "description": "输出文件URL"
         },
         "priority": {
-          "type": "integer"
+          "type": "integer",
+          "description": "任务优先级"
         }
       }
     },
@@ -474,7 +513,8 @@
       "type": "object",
       "properties": {
         "url": {
-          "type": "string"
+          "type": "string",
+          "description": "视频URL地址"
         }
       }
     },
@@ -482,16 +522,20 @@
       "type": "object",
       "properties": {
         "status": {
-          "type": "string"
+          "type": "string",
+          "description": "处理状态"
         },
         "message": {
-          "type": "string"
+          "type": "string",
+          "description": "返回消息"
         },
         "tsFilePath": {
-          "type": "string"
+          "type": "string",
+          "description": "TS文件路径"
         },
         "error": {
-          "type": "string"
+          "type": "string",
+          "description": "错误信息"
         }
       }
     },
@@ -499,16 +543,20 @@
       "type": "object",
       "properties": {
         "ossOutput": {
-          "$ref": "#/definitions/api.OSSOutput"
+          "$ref": "#/definitions/api.OSSOutput",
+          "description": "OSS输出配置"
         },
         "outputPath": {
-          "type": "string"
+          "type": "string",
+          "description": "输出路径"
         },
         "priority": {
-          "type": "integer"
+          "type": "integer",
+          "description": "任务优先级"
         },
         "spec": {
-          "type": "object"
+          "type": "object",
+          "description": "任务规格"
         }
       }
     },
@@ -516,16 +564,20 @@
       "type": "object",
       "properties": {
         "message": {
-          "type": "string"
+          "type": "string",
+          "description": "返回消息"
         },
         "outputUrl": {
-          "type": "string"
+          "type": "string",
+          "description": "输出文件URL"
         },
         "status": {
-          "type": "string"
+          "type": "string",
+          "description": "任务状态"
         },
         "taskId": {
-          "type": "string"
+          "type": "string",
+          "description": "任务ID"
         }
       }
     },
@@ -533,34 +585,44 @@
       "type": "object",
       "properties": {
         "created": {
-          "type": "string"
+          "type": "string",
+          "description": "任务创建时间"
         },
         "error": {
-          "type": "string"
+          "type": "string",
+          "description": "错误信息"
         },
         "finished": {
-          "type": "string"
+          "type": "string",
+          "description": "任务完成时间"
         },
         "id": {
-          "type": "string"
+          "type": "string",
+          "description": "任务ID"
         },
         "priority": {
-          "type": "integer"
+          "type": "integer",
+          "description": "任务优先级"
         },
         "progress": {
-          "type": "number"
+          "type": "number",
+          "description": "任务进度(0-1)"
         },
         "result": {
-          "type": "string"
+          "type": "string",
+          "description": "任务结果"
         },
         "spec": {
-          "type": "object"
+          "type": "object",
+          "description": "任务规格"
         },
         "started": {
-          "type": "string"
+          "type": "string",
+          "description": "任务开始时间"
         },
         "status": {
-          "type": "string"
+          "type": "string",
+          "description": "任务状态"
         }
       }
     }
