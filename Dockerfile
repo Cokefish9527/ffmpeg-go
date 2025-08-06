@@ -37,7 +37,7 @@ RUN adduser -D -s /bin/sh appuser
 WORKDIR /app
 
 # 从构建阶段复制编译好的二进制文件
-COPY --from=builder /app/ffmpeg-go .
+COPY --from=builder /app/ffmpeg-go ./ffmpeg-go
 
 # 创建必要的目录
 RUN mkdir -p data temp
