@@ -265,36 +265,6 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 		})
 	}
 
-	// 获取转换前文件属性
-	getPropsStart := time.Now()
-	var inputProps *VideoProperties
-	if taskLogger != nil {
-		props, err := GetVideoProperties(source)
-		if err == nil {
-			inputProps = props
-			taskLogger.Log("INFO", "转换前文件属性", map[string]interface{}{
-				"fileName": props.FileName,
-				"duration": props.Duration,
-				"width":    props.Width,
-				"height":   props.Height,
-				"codec":    props.Codec,
-				"bitrate":  props.Bitrate,
-				"size":     props.Size,
-				"format":   props.Format,
-			})
-		} else {
-			taskLogger.Log("WARN", "无法获取转换前文件属性", map[string]interface{}{
-				"error": err.Error(),
-			})
-		}
-	}
-	getPropsDuration := time.Since(getPropsStart).Seconds()
-	if taskLogger != nil {
-		taskLogger.Log("INFO", "获取源文件属性耗时", map[string]interface{}{
-			"duration": getPropsDuration,
-		})
-	}
-
 	// 生成输出文件路径 (TS格式)
 	pathGenStart := time.Now()
 	ext := filepath.Ext(source)
@@ -335,36 +305,6 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 		})
 	}
 
-	// 获取转换后文件属性
-	getOutputPropsStart := time.Now()
-	var outputProps *VideoProperties
-	if taskLogger != nil {
-		props, err := GetVideoProperties(outputFile)
-		if err == nil {
-			outputProps = props
-			taskLogger.Log("INFO", "转换后文件属性", map[string]interface{}{
-				"fileName": props.FileName,
-				"duration": props.Duration,
-				"width":    props.Width,
-				"height":   props.Height,
-				"codec":    props.Codec,
-				"bitrate":  props.Bitrate,
-				"size":     props.Size,
-				"format":   props.Format,
-			})
-		} else {
-			taskLogger.Log("WARN", "无法获取转换后文件属性", map[string]interface{}{
-				"error": err.Error(),
-			})
-		}
-	}
-	getOutputPropsDuration := time.Since(getOutputPropsStart).Seconds()
-	if taskLogger != nil {
-		taskLogger.Log("INFO", "获取输出文件属性耗时", map[string]interface{}{
-			"duration": getOutputPropsDuration,
-		})
-	}
-
 	// 记录任务处理总时间
 	endTime := time.Now()
 	totalDuration := endTime.Sub(startTime).Seconds()
@@ -373,14 +313,9 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 		taskLogger.Log("INFO", "任务处理完成", map[string]interface{}{
 			"totalDuration": totalDuration,
 			"fileCheckDuration": fileCheckDuration,
-			"getPropsDuration": getPropsDuration,
 			"pathGenDuration": pathGenDuration,
 			"conversionDuration": conversionDuration,
-			"getOutputPropsDuration": getOutputPropsDuration,
 		})
-
-		// 记录格式转换任务详细日志
-		taskLogger.LogFormatConversionTask(task, 0, conversionDuration, inputProps, outputProps)
 	}
 
 	// 更新任务状态为已完成
