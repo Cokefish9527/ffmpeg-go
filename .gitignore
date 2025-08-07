@@ -8,3 +8,5 @@
 ffmpeg-service
 service/worker_pool.go.bak
 data/tasks.json
+/output
+/data
