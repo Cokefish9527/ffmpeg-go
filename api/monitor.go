@@ -514,43 +514,29 @@ func (m *MonitorAPI) DiscardTask(c *gin.Context) {
 	})
 }
 
-// GetTaskExecutions 获取任务执行历史
+// GetTaskExecutions 获取任务的所有执行历史
 func (m *MonitorAPI) GetTaskExecutions(c *gin.Context) {
-	utils.Debug("收到任务执行历史请求", map[string]string{"clientIP": c.ClientIP()})
-
-	taskID := c.Param("taskId")
-	if taskID == "" {
-		utils.Warn("任务ID不能为空", nil)
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "Task ID is required",
-		})
-		return
-	}
-
-	// 获取任务执行历史
-	executions, err := m.taskQueue.GetTaskExecutions(taskID)
-	if err != nil {
-		utils.Error("获取任务执行历史失败", map[string]string{
-			"taskId": taskID,
-			"error":  err.Error(),
-		})
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to get task executions",
-		})
-		return
-	}
-
-	if executions == nil {
-		utils.Warn("任务执行历史不存在", map[string]string{"taskId": taskID})
-		c.JSON(http.StatusNotFound, gin.H{
-			"error": "Task executions not found",
-		})
-		return
-	}
-
-	utils.Info("任务执行历史获取成功", map[string]string{"taskId": taskID})
-	c.JSON(http.StatusOK, executions)
-
+    taskId := c.Param("taskId")
+    utils.Debug("收到任务执行历史请求", map[string]string{
+        "taskId":   taskId,
+        "clientIP": c.ClientIP(),
+    })
+    
+    // 获取任务执行历史
+    executions, err := m.taskQueue.GetTaskExecutions(taskId)
+    if err != nil {
+        utils.Error("获取任务执行历史失败", map[string]string{
+            "taskId": taskId,
+            "error":  err.Error(),
+        })
+        c.JSON(http.StatusInternalServerError, gin.H{
+            "error": "Failed to get task executions",
+        })
+        return
+    }
+    
+    utils.Info("任务执行历史获取成功", map[string]string{"taskId": taskId})
+    c.JSON(http.StatusOK, executions)
 }
 
 // GetTaskLog 获取任务日志

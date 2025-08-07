@@ -215,7 +215,7 @@ func (w *Worker) processTask(task *queue.Task) {
     task.Started = time.Now()
     task.Progress = 0.0
     
-    // 更新任务到队列
+    // 更新任务到队列，记录执行历史
     if err := w.taskQueue.Update(task); err != nil {
         w.logger.Error("更新任务状态失败", map[string]string{
             "taskId": task.ID,
@@ -250,7 +250,7 @@ func (w *Worker) processTask(task *queue.Task) {
 		task.Progress = 1.0
 	}
 	
-	// 更新任务到队列
+	// 更新任务到队列，记录执行历史
 	if err := w.taskQueue.Update(task); err != nil {
 		w.logger.Error("更新任务状态失败", map[string]string{
 			"taskId": task.ID,
