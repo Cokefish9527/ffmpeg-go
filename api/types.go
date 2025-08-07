@@ -90,6 +90,8 @@ type VideoURLResponse struct {
 	Message string `json:"message"`
 	// TSFilePath 转换后的TS文件本地路径
 	TSFilePath string `json:"tsFilePath,omitempty"`
+	// TaskID 任务ID，用于查询任务状态
+	TaskID string `json:"taskId,omitempty"`
 	// Error 错误信息（如果有）
 	Error string `json:"error,omitempty"`
 }

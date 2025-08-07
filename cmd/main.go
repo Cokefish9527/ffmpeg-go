@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -47,6 +48,7 @@ type VideoURLResponse struct {
 	Message    string `json:"message"`
 	TSFilePath string `json:"tsFilePath,omitempty"`
 	Error      string `json:"error,omitempty"`
+	TaskID     string `json:"taskId,omitempty"`
 }
 
 // downloadFile 下载文件到指定路径
@@ -309,17 +311,41 @@ func main() {
 
 			// 生成临时文件名
 			filename := fmt.Sprintf("%s/%s_temp.mp4", tempDir, taskID)
-
-			// 下载文件
-			err := downloadFile(req.URL, filename)
-			if err != nil {
+			
+			// 创建一个带超时的上下文，限制下载时间
+			downloadCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			defer cancel()
+			
+			// 使用goroutine下载文件，避免阻塞API
+			downloadCh := make(chan error, 1)
+			go func() {
+				downloadCh <- downloadFile(req.URL, filename)
+			}()
+			
+			// 等待下载完成或超时
+			var downloadErr error
+			select {
+			case downloadErr = <-downloadCh:
+				// 下载完成
+			case <-downloadCtx.Done():
+				// 下载超时
+				downloadErr = fmt.Errorf("download timeout")
+			}
+			
+			if downloadErr != nil {
+				// 清理已创建的文件
+				os.Remove(filename)
 				c.JSON(http.StatusInternalServerError, VideoURLResponse{
 					Status:  "error",
 					Message: "Failed to download file",
-					Error:   err.Error(),
+					Error:   downloadErr.Error(),
 				})
 				return
 			}
+
+			// 生成输出文件路径 (TS格式)
+			ext := filepath.Ext(filename)
+			outputFile := filename[0:len(filename)-len(ext)] + ".ts"
 
 			// 创建任务对象，与素材预处理器兼容
 			task := &queue.Task{
@@ -335,6 +361,8 @@ func main() {
 
 			// 将任务添加到队列
 			if err := taskQueue.Push(task); err != nil {
+				// 清理已下载的文件
+				os.Remove(filename)
 				c.JSON(http.StatusInternalServerError, VideoURLResponse{
 					Status:  "error",
 					Message: "Failed to add task to queue",
@@ -343,50 +371,102 @@ func main() {
 				return
 			}
 
-			// 等待任务完成（简化处理，实际项目中应该异步处理）
-			for i := 0; i < 30; i++ { // 最多等待30秒
-				task, err := taskQueue.Get(taskID)
-				if err != nil {
-					c.JSON(http.StatusInternalServerError, VideoURLResponse{
-						Status:  "error",
-						Message: "Failed to get task status",
-						Error:   err.Error(),
-					})
-					return
-				}
+			// 使用goroutine处理转换任务，提高API响应速度
+			go func() {
+				// 等待任务完成（最多等待60秒）
+				timeout := time.After(60 * time.Second)
+				ticker := time.NewTicker(1 * time.Second)
+				defer ticker.Stop()
 
-				if task.Status == "completed" {
-					// 获取完整路径
-					absPath, err := filepath.Abs(task.Result)
-					if err != nil {
-						absPath = task.Result // 如果获取失败，使用原始路径
+				for {
+					select {
+					case <-timeout:
+						// 超时处理
+						task.Status = "failed"
+						task.Error = "Video conversion timeout"
+						taskQueue.Update(task)
+						// 清理文件
+						os.Remove(filename)
+						os.Remove(outputFile)
+						return
+					case <-ticker.C:
+						updatedTask, err := taskQueue.Get(taskID)
+						if err != nil {
+							// 获取任务状态失败
+							task.Status = "failed"
+							task.Error = "Failed to get task status"
+							taskQueue.Update(task)
+							// 清理文件
+							os.Remove(filename)
+							os.Remove(outputFile)
+							return
+						}
+
+						if updatedTask.Status == "completed" {
+							// 转换成功完成，文件清理将在适当时机进行
+							return
+						}
+
+						if updatedTask.Status == "failed" {
+							// 转换失败，清理文件
+							os.Remove(filename)
+							os.Remove(outputFile)
+							return
+						}
+						// 任务仍在处理中，继续等待
 					}
-
-					c.JSON(http.StatusOK, VideoURLResponse{
-						Status:     "success",
-						Message:    "Video converted successfully",
-						TSFilePath: absPath,
-					})
-					return
 				}
+			}()
 
-				if task.Status == "failed" {
-					c.JSON(http.StatusInternalServerError, VideoURLResponse{
-						Status:  "error",
-						Message: "Failed to convert video",
-						Error:   task.Error,
-					})
-					return
-				}
-
-				time.Sleep(1 * time.Second)
-			}
-
-			c.JSON(http.StatusRequestTimeout, VideoURLResponse{
-				Status:  "error",
-				Message: "Video conversion timeout",
-				Error:   "The conversion process took too long",
+			// 立即返回任务已接受的响应
+			c.JSON(http.StatusAccepted, VideoURLResponse{
+				Status:     "accepted",
+				Message:    "Video conversion task accepted",
+				TSFilePath: outputFile,
+				TaskID:     taskID,
 			})
+		})
+		
+		// 查询视频URL转换任务状态接口
+		apiGroup.GET("/video/url/:taskId", func(c *gin.Context) {
+			taskID := c.Param("taskId")
+			
+			task, err := taskQueue.Get(taskID)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Failed to get task status",
+				})
+				return
+			}
+			
+			if task == nil {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Task not found",
+				})
+				return
+			}
+			
+			response := TaskStatusResponse{
+				TaskID:   task.ID,
+				Status:   task.Status,
+				Progress: task.Progress,
+				Message:  task.Error,
+			}
+			
+			if !task.Created.IsZero() {
+				response.Created = task.Created.Format(time.RFC3339)
+			}
+			
+			if !task.Started.IsZero() {
+				response.Started = task.Started.Format(time.RFC3339)
+			}
+			
+			if !task.Finished.IsZero() {
+				response.Finished = task.Finished.Format(time.RFC3339)
+				response.OutputURL = task.Result
+			}
+			
+			c.JSON(http.StatusOK, response)
 		})
 	}
 
