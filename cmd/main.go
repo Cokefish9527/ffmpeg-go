@@ -10,6 +10,7 @@ import (
 	"github.com/u2takey/ffmpeg-go/api"
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
+	"github.com/google/uuid"
 )
 
 // TaskStatusResponse 任务状态响应
@@ -141,8 +142,7 @@ func main() {
 			}
 
 			// 生成任务ID
-			tasks, _ := taskQueue.List()
-			taskID := fmt.Sprintf("task-%d", len(tasks))
+			taskID := fmt.Sprintf("t-%s", uuid.New().String())
 
 			// 创建临时目录
 			tempDir := "./temp"

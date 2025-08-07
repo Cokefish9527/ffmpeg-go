@@ -15,6 +15,7 @@ import (
 	
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/utils"
+	"github.com/google/uuid"
 )
 
 var (
@@ -264,25 +265,29 @@ func (w *Worker) processTask(task *queue.Task) {
 
 // executeTask 执行具体任务
 func (w *Worker) executeTask(task *queue.Task) (string, error) {
-	// 获取任务类型
-	taskType, ok := task.Spec.(map[string]interface{})["taskType"].(string)
-	if !ok {
-		return "", fmt.Errorf("invalid task type")
-	}
-	
-	w.logger.Info("执行任务", map[string]string{
-		"taskId":   task.ID,
-		"taskType": taskType,
-	})
-	
-	switch taskType {
-	case "materialPreprocess":
-		return w.executeMaterialPreprocess(task)
-	case "videoEdit":
-		return w.executeVideoEdit(task)
-	default:
-		return "", fmt.Errorf("unsupported task type: %s", taskType)
-	}
+    // 获取任务类型
+    taskType, ok := task.Spec.(map[string]interface{})["taskType"].(string)
+    if !ok {
+        return "", fmt.Errorf("invalid task type")
+    }
+
+    // 生成任务ID
+    taskID := fmt.Sprintf("m-%s", uuid.New().String())
+    task.ID = taskID
+
+    w.logger.Info("执行任务", map[string]string{
+        "taskId":   task.ID,
+        "taskType": taskType,
+    })
+
+    switch taskType {
+    case "materialPreprocess":
+        return w.executeMaterialPreprocess(task)
+    case "videoEdit":
+        return w.executeVideoEdit(task)
+    default:
+        return "", fmt.Errorf("unsupported task type: %s", taskType)
+    }
 }
 
 // executeMaterialPreprocess 执行素材预处理任务

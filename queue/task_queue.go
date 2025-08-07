@@ -74,10 +74,10 @@ func NewInMemoryTaskQueue() *InMemoryTaskQueue {
 	}
 }
 
-// Push 添加任务到队列
-func (q *InMemoryTaskQueue) Push(task *Task) error {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
+// Push 将任务推入队列
+func (tq *InMemoryTaskQueue) Push(task *Task) error {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
 	
 	// 如果任务没有ID，则生成一个
 	if task.ID == "" {
@@ -117,32 +117,43 @@ func (q *InMemoryTaskQueue) Push(task *Task) error {
 			Priority:        task.Priority,
 			ExecutionNumber: task.ExecutionCount,
 		}
-		if q.executions[task.ID] == nil {
-			q.executions[task.ID] = make([]*TaskExecution, 0)
+		if tq.executions[task.ID] == nil {
+			tq.executions[task.ID] = make([]*TaskExecution, 0)
 		}
-		q.executions[task.ID] = append(q.executions[task.ID], execution)
+		tq.executions[task.ID] = append(tq.executions[task.ID], execution)
 	}
 	
-	q.tasks[task.ID] = task
+	tq.tasks[task.ID] = task
 	return nil
 }
 
 // Pop 从队列中取出任务
-func (q *InMemoryTaskQueue) Pop() (*Task, error) {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
+func (tq *InMemoryTaskQueue) Pop() (*Task, error) {
+    task, err := tq.internalPop()
+    if err != nil {
+        return nil, err
+    }
+
+    // 不增加执行次数
+    // task.ExecutionCount++
+
+    return task, nil
+}
+
+// internalPop 从队列中取出任务
+func (tq *InMemoryTaskQueue) internalPop() (*Task, error) {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
 	
 	// 优先级调度：先查找高优先级任务
 	for priority := PriorityCritical; priority >= PriorityLow; priority-- {
-		for _, task := range q.tasks {
+		for _, task := range tq.tasks {
 			if task.Status == "pending" && task.Priority == priority {
 				// 更新任务状态为处理中
 				task.Status = "processing"
 				task.Started = time.Now()
-				// 增加执行次数（除了第一次执行）
-				if task.ExecutionCount > 0 {
-					task.ExecutionCount++
-				} else {
+				// 不增加执行次数，因为这是任务的第一次执行
+				if task.ExecutionCount == 0 {
 					task.ExecutionCount = 1
 				}
 				task.LastExecution = time.Now()
@@ -162,10 +173,10 @@ func (q *InMemoryTaskQueue) Pop() (*Task, error) {
 					Priority:        task.Priority,
 					ExecutionNumber: task.ExecutionCount,
 				}
-				if q.executions[task.ID] == nil {
-					q.executions[task.ID] = make([]*TaskExecution, 0)
+				if tq.executions[task.ID] == nil {
+					tq.executions[task.ID] = make([]*TaskExecution, 0)
 				}
-				q.executions[task.ID] = append(q.executions[task.ID], execution)
+				tq.executions[task.ID] = append(tq.executions[task.ID], execution)
 				
 				return task, nil
 			}
@@ -173,15 +184,13 @@ func (q *InMemoryTaskQueue) Pop() (*Task, error) {
 	}
 	
 	// 如果没有找到按优先级的任务，返回任意pending任务
-	for _, task := range q.tasks {
+	for _, task := range tq.tasks {
 		if task.Status == "pending" {
 			// 更新任务状态为处理中
 			task.Status = "processing"
 			task.Started = time.Now()
-			// 增加执行次数（除了第一次执行）
-			if task.ExecutionCount > 0 {
-				task.ExecutionCount++
-			} else {
+			// 不增加执行次数，因为这是任务的第一次执行
+			if task.ExecutionCount == 0 {
 				task.ExecutionCount = 1
 			}
 			task.LastExecution = time.Now()
@@ -201,10 +210,10 @@ func (q *InMemoryTaskQueue) Pop() (*Task, error) {
 				Priority:        task.Priority,
 				ExecutionNumber: task.ExecutionCount,
 			}
-			if q.executions[task.ID] == nil {
-				q.executions[task.ID] = make([]*TaskExecution, 0)
+			if tq.executions[task.ID] == nil {
+				tq.executions[task.ID] = make([]*TaskExecution, 0)
 			}
-			q.executions[task.ID] = append(q.executions[task.ID], execution)
+			tq.executions[task.ID] = append(tq.executions[task.ID], execution)
 			
 			return task, nil
 		}
@@ -214,11 +223,11 @@ func (q *InMemoryTaskQueue) Pop() (*Task, error) {
 }
 
 // GetTaskExecutions 获取任务的所有执行历史
-func (q *InMemoryTaskQueue) GetTaskExecutions(taskID string) ([]*TaskExecution, error) {
-	q.mutex.RLock()
-	defer q.mutex.RUnlock()
+func (tq *InMemoryTaskQueue) GetTaskExecutions(taskID string) ([]*TaskExecution, error) {
+	tq.mutex.RLock()
+	defer tq.mutex.RUnlock()
 
-	executions, exists := q.executions[taskID]
+	executions, exists := tq.executions[taskID]
 	if !exists {
 		return nil, nil
 	}
@@ -230,12 +239,12 @@ func (q *InMemoryTaskQueue) GetTaskExecutions(taskID string) ([]*TaskExecution, 
 }
 
 // List 列出所有任务
-func (q *InMemoryTaskQueue) List() ([]*Task, error) {
-	q.mutex.RLock()
-	defer q.mutex.RUnlock()
+func (tq *InMemoryTaskQueue) List() ([]*Task, error) {
+	tq.mutex.RLock()
+	defer tq.mutex.RUnlock()
 	
-	tasks := make([]*Task, 0, len(q.tasks))
-	for _, task := range q.tasks {
+	tasks := make([]*Task, 0, len(tq.tasks))
+	for _, task := range tq.tasks {
 		tasks = append(tasks, task)
 	}
 	
@@ -243,11 +252,11 @@ func (q *InMemoryTaskQueue) List() ([]*Task, error) {
 }
 
 // Get 获取指定ID的任务
-func (q *InMemoryTaskQueue) Get(id string) (*Task, error) {
-	q.mutex.RLock()
-	defer q.mutex.RUnlock()
+func (tq *InMemoryTaskQueue) Get(id string) (*Task, error) {
+	tq.mutex.RLock()
+	defer tq.mutex.RUnlock()
 	
-	task, exists := q.tasks[id]
+	task, exists := tq.tasks[id]
 	if !exists {
 		return nil, nil
 	}
@@ -256,10 +265,10 @@ func (q *InMemoryTaskQueue) Get(id string) (*Task, error) {
 }
 
 // Update 更新任务
-func (q *InMemoryTaskQueue) Update(task *Task) error {
-	q.mutex.Lock()
-	defer q.mutex.Unlock()
+func (tq *InMemoryTaskQueue) Update(task *Task) error {
+	tq.mutex.Lock()
+	defer tq.mutex.Unlock()
 	
-	q.tasks[task.ID] = task
+	tq.tasks[task.ID] = task
 	return nil
 }

@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
 	ffmpeg_go "github.com/u2takey/ffmpeg-go"
 	"github.com/u2takey/ffmpeg-go/queue"
 )
@@ -201,6 +202,11 @@ func NewMaterialPreprocessorService() MaterialPreprocessor {
 
 // Process 处理素材预处理任务
 func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
+	// 如果任务没有ID，则生成一个
+	if task.ID == "" {
+		task.ID = fmt.Sprintf("t-%s", uuid.New().String())
+	}
+
 	// 创建任务日志记录器
 	taskLogger, err := NewTaskLogger(task.ID)
 	if err != nil {
@@ -212,6 +218,11 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 			"taskId": task.ID,
 			"status": "processing",
 		})
+	}
+
+	// 生成符合规范的任务ID
+	if !strings.HasPrefix(task.ID, "t-") {
+		task.ID = fmt.Sprintf("t-%s", uuid.New().String())
 	}
 
 	// 记录开始时间
