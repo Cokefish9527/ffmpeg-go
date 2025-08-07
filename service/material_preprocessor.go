@@ -3,15 +3,15 @@
 package service
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
 	"path/filepath"
-	"bytes"
 	"strings"
 	"time"
-	
+
 	ffmpeg_go "github.com/u2takey/ffmpeg-go"
 	"github.com/u2takey/ffmpeg-go/queue"
 )
@@ -53,9 +53,9 @@ func (l *TaskLogger) Log(level, message string, data map[string]interface{}) {
 	if l == nil {
 		return // 安全处理 nil 接收者
 	}
-	
+
 	logFile := filepath.Join(l.logDir, fmt.Sprintf("%s.log", l.taskID))
-	
+
 	// 构建日志条目
 	logEntry := fmt.Sprintf(
 		"%s [%s] %s | %v\n",
@@ -64,7 +64,7 @@ func (l *TaskLogger) Log(level, message string, data map[string]interface{}) {
 		message,
 		data,
 	)
-	
+
 	// 追加写入日志文件
 	f, err := os.OpenFile(logFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
@@ -85,24 +85,24 @@ func GetVideoProperties(filePath string) (*VideoProperties, error) {
 	if info, err := os.Stat(filePath); err == nil {
 		size = info.Size()
 	}
-	
+
 	// 使用ffprobe获取视频信息
 	probeData, err := ffmpeg_go.Probe(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("无法探测视频文件属性: %v", err)
 	}
-	
+
 	// 解析JSON数据
 	var probeResult map[string]interface{}
 	if err := json.Unmarshal([]byte(probeData), &probeResult); err != nil {
 		return nil, fmt.Errorf("解析视频属性失败: %v", err)
 	}
-	
+
 	props := &VideoProperties{
 		FileName: filepath.Base(filePath),
 		Size:     size,
 	}
-	
+
 	// 提取格式信息
 	if format, ok := probeResult["format"].(map[string]interface{}); ok {
 		if duration, ok := format["duration"].(string); ok {
@@ -115,7 +115,7 @@ func GetVideoProperties(filePath string) (*VideoProperties, error) {
 			props.Bitrate = bitrate
 		}
 	}
-	
+
 	// 提取视频流信息
 	if streams, ok := probeResult["streams"].([]interface{}); ok {
 		for _, stream := range streams {
@@ -135,12 +135,12 @@ func GetVideoProperties(filePath string) (*VideoProperties, error) {
 			}
 		}
 	}
-	
+
 	return props, nil
 }
 
 // LogFormatConversionTask 记录格式转换任务日志
-func (l *TaskLogger) LogFormatConversionTask(task *queue.Task, downloadTime, convertTime float64, 
+func (l *TaskLogger) LogFormatConversionTask(task *queue.Task, downloadTime, convertTime float64,
 	inputProps, outputProps *VideoProperties) {
 	// 记录各阶段耗时
 	l.Log("INFO", "格式转换任务各阶段耗时", map[string]interface{}{
@@ -148,7 +148,7 @@ func (l *TaskLogger) LogFormatConversionTask(task *queue.Task, downloadTime, con
 		"convertTime":  convertTime,
 		"totalTime":    downloadTime + convertTime,
 	})
-	
+
 	// 记录转换前后文件属性
 	if inputProps != nil {
 		l.Log("INFO", "转换前文件属性", map[string]interface{}{
@@ -162,7 +162,7 @@ func (l *TaskLogger) LogFormatConversionTask(task *queue.Task, downloadTime, con
 			"format":   inputProps.Format,
 		})
 	}
-	
+
 	if outputProps != nil {
 		l.Log("INFO", "转换后文件属性", map[string]interface{}{
 			"fileName": outputProps.FileName,
@@ -206,17 +206,17 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	if err != nil {
 		// 即使日志记录器创建失败，也继续处理任务
 	}
-	
+
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "开始处理素材预处理任务", map[string]interface{}{
 			"taskId": task.ID,
 			"status": "processing",
 		})
 	}
-	
+
 	// 记录开始时间
 	startTime := time.Now()
-	
+
 	// 更新任务状态为处理中
 	task.Status = "processing"
 	task.Progress = 0.0
@@ -243,24 +243,30 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	}
 
 	// 检查源文件是否存在
+	fileCheckStart := time.Now()
 	if _, err := os.Stat(source); os.IsNotExist(err) {
+		fileCheckDuration := time.Since(fileCheckStart).Seconds()
 		if taskLogger != nil {
 			taskLogger.Log("ERROR", "源文件不存在", map[string]interface{}{
 				"source": source,
 				"error":  err.Error(),
+				"duration": fileCheckDuration,
 			})
 		}
 		s.sendCallback(task, "failed", "", err.Error())
 		return fmt.Errorf("source file does not exist: %s", source)
 	}
+	fileCheckDuration := time.Since(fileCheckStart).Seconds()
 
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "源文件检查完成", map[string]interface{}{
 			"source": source,
+			"duration": fileCheckDuration,
 		})
 	}
-	
+
 	// 获取转换前文件属性
+	getPropsStart := time.Now()
 	var inputProps *VideoProperties
 	if taskLogger != nil {
 		props, err := GetVideoProperties(source)
@@ -282,16 +288,31 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 			})
 		}
 	}
+	getPropsDuration := time.Since(getPropsStart).Seconds()
+	if taskLogger != nil {
+		taskLogger.Log("INFO", "获取源文件属性耗时", map[string]interface{}{
+			"duration": getPropsDuration,
+		})
+	}
 
 	// 生成输出文件路径 (TS格式)
+	pathGenStart := time.Now()
 	ext := filepath.Ext(source)
 	outputFile := source[0:len(source)-len(ext)] + ".ts"
+	pathGenDuration := time.Since(pathGenStart).Seconds()
+
+	if taskLogger != nil {
+		taskLogger.Log("INFO", "输出路径生成完成", map[string]interface{}{
+			"outputFile": outputFile,
+			"duration": pathGenDuration,
+		})
+	}
 
 	// 记录转换开始时间
 	conversionStart := time.Now()
-	
+
 	// 使用FFmpeg将文件转换为TS格式
-	err = s.convertToTS(source, outputFile)
+	err = s.convertToTS(source, outputFile, taskLogger)
 	if err != nil {
 		task.Status = "failed"
 		task.Error = err.Error()
@@ -303,11 +324,11 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 		s.sendCallback(task, "failed", "", err.Error())
 		return err
 	}
-	
+
 	// 记录转换结束时间
 	conversionEnd := time.Now()
 	conversionDuration := conversionEnd.Sub(conversionStart).Seconds()
-	
+
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "格式转换完成", map[string]interface{}{
 			"duration": conversionDuration,
@@ -315,6 +336,7 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	}
 
 	// 获取转换后文件属性
+	getOutputPropsStart := time.Now()
 	var outputProps *VideoProperties
 	if taskLogger != nil {
 		props, err := GetVideoProperties(outputFile)
@@ -336,16 +358,27 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 			})
 		}
 	}
-	
+	getOutputPropsDuration := time.Since(getOutputPropsStart).Seconds()
+	if taskLogger != nil {
+		taskLogger.Log("INFO", "获取输出文件属性耗时", map[string]interface{}{
+			"duration": getOutputPropsDuration,
+		})
+	}
+
 	// 记录任务处理总时间
 	endTime := time.Now()
 	totalDuration := endTime.Sub(startTime).Seconds()
-	
+
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "任务处理完成", map[string]interface{}{
 			"totalDuration": totalDuration,
+			"fileCheckDuration": fileCheckDuration,
+			"getPropsDuration": getPropsDuration,
+			"pathGenDuration": pathGenDuration,
+			"conversionDuration": conversionDuration,
+			"getOutputPropsDuration": getOutputPropsDuration,
 		})
-		
+
 		// 记录格式转换任务详细日志
 		taskLogger.LogFormatConversionTask(task, 0, conversionDuration, inputProps, outputProps)
 	}
@@ -354,22 +387,45 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	task.Status = "completed"
 	task.Progress = 1.0
 	task.Result = outputFile
-	
+
 	s.sendCallback(task, "completed", outputFile, "")
-	
+
 	return nil
 }
 
 // convertToTS 使用FFmpeg将视频文件转换为TS格式
-func (s *MaterialPreprocessorService) convertToTS(inputFile, outputFile string) error {
-	return ffmpeg_go.Input(inputFile).
+func (s *MaterialPreprocessorService) convertToTS(inputFile, outputFile string, taskLogger *TaskLogger) error {
+	// 记录FFmpeg命令构建时间
+	buildCmdStart := time.Now()
+
+	ffmpeg := ffmpeg_go.Input(inputFile).
 		Output(outputFile, ffmpeg_go.KwArgs{
 			"c":        "copy",        // 直接复制编解码器
 			"bsf:v":    "h264_mp4toannexb", // 视频比特流过滤器
 			"f":        "mpegts",      // 输出格式为MPEG-TS
 		}).
-		OverWriteOutput().
-		Run()
+		OverWriteOutput()
+
+	buildCmdDuration := time.Since(buildCmdStart).Seconds()
+	if taskLogger != nil {
+		taskLogger.Log("INFO", "FFmpeg命令构建完成", map[string]interface{}{
+			"duration": buildCmdDuration,
+		})
+	}
+
+	// 记录FFmpeg执行时间
+	execStart := time.Now()
+	err := ffmpeg.Run()
+	execDuration := time.Since(execStart).Seconds()
+
+	if taskLogger != nil {
+		taskLogger.Log("INFO", "FFmpeg执行完成", map[string]interface{}{
+			"duration": execDuration,
+			"success": err == nil,
+		})
+	}
+
+	return err
 }
 
 // sendCallback 发送回调通知

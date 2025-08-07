@@ -721,27 +721,42 @@
                     const taskList = document.getElementById('taskList');
                     taskList.innerHTML = '';
                     
-                    // 只显示非失败状态的任务
-                    const nonFailedTasks = data.filter(task => task.status !== 'failed');
+                    // 只显示非失败状态的任务，并按创建时间排序(旧到新)
+                    let filteredTasks = data.filter(task => task.status !== 'failed');
+                    filteredTasks.sort((a, b) => new Date(a.created) - new Date(b.created));
                     
-                    nonFailedTasks.forEach(task => {
+                    if (filteredTasks.length === 0) {
+                        const row = document.createElement('tr');
+                        row.innerHTML = '<td colspan="8" style="text-align: center;">暂无数据</td>';
+                        taskList.appendChild(row);
+                        return;
+                    }
+                    
+                    filteredTasks.forEach(task => {
                         const row = document.createElement('tr');
                         
                         // 格式化状态显示
+                        let statusText = '';
                         let statusClass = '';
                         switch(task.status) {
                             case 'pending':
+                                statusText = '待处理';
                                 statusClass = 'status-pending';
                                 break;
                             case 'processing':
+                                statusText = '处理中';
                                 statusClass = 'status-processing';
                                 break;
                             case 'completed':
+                                statusText = '已完成';
                                 statusClass = 'status-completed';
                                 break;
                             case 'failed':
+                                statusText = '失败';
                                 statusClass = 'status-failed';
                                 break;
+                            default:
+                                statusText = task.status;
                         }
                         
                         // 格式化优先级显示
@@ -788,22 +803,18 @@
                         
                         row.innerHTML = `
                             <td>${task.id}</td>
-                            <td class="${statusClass}">${task.status}</td>
+                            <td class="${statusClass}">${statusText}</td>
                             <td>${priorityText}</td>
                             <td>${createdTime}</td>
                             <td>${task.executionCount || 1}</td>
                             <td>${lastExecutionTime}</td>
                             <td>${duration}</td>
                             <td>
-                                <button class="btn btn-view" onclick="viewExecutions('${task.id}')">查看</button>
-                                ${task.status === 'failed' ? 
-                                    `<button class="btn btn-retry" onclick="retryTask('${task.id}')">重试</button>` : 
-                                    ''
-                                }
-                                ${(task.status === 'failed' || task.status === 'completed') ? 
-                                    `<button class="btn btn-discard" onclick="discardTask('${task.id}')">丢弃</button>` : 
-                                    ''
-                                }
+                                <div class="button-group">
+                                    <button class="btn btn-view" onclick="viewExecutions('${task.id}')" title="查看执行历史">
+                                        <i class="icon-view"></i>查看
+                                    </button>
+                                </div>
                             </td>
                         `;
                         
@@ -823,8 +834,9 @@
                     const failedTaskList = document.getElementById('failedTaskList');
                     failedTaskList.innerHTML = '';
                     
-                    // 只显示失败状态的任务
+                    // 只显示失败状态的任务，并按创建时间排序(旧到新)
                     const failedTasks = data.filter(task => task.status === 'failed');
+                    failedTasks.sort((a, b) => new Date(a.created) - new Date(b.created));
                     
                     failedTasks.forEach(task => {
                         const row = document.createElement('tr');
@@ -1038,6 +1050,9 @@
                 .then(data => {
                     const executionList = document.getElementById('executionList');
                     executionList.innerHTML = '';
+                    
+                    // 按执行序号排序
+                    data.sort((a, b) => a.executionNumber - b.executionNumber);
                     
                     data.forEach(execution => {
                         const row = document.createElement('tr');

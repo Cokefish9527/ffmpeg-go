@@ -287,79 +287,15 @@ func (w *Worker) executeTask(task *queue.Task) (string, error) {
 
 // executeMaterialPreprocess 执行素材预处理任务
 func (w *Worker) executeMaterialPreprocess(task *queue.Task) (string, error) {
-	spec, ok := task.Spec.(map[string]interface{})
-	if !ok {
-		return "", fmt.Errorf("invalid task spec")
-	}
-	
-	// 获取源文件路径
-	source, ok := spec["source"].(string)
-	if !ok {
-		return "", fmt.Errorf("invalid source")
-	}
-	
-	// 创建输出目录
-	outputDir := "./output"
-	if _, err := os.Stat(outputDir); os.IsNotExist(err) {
-		if err := os.MkdirAll(outputDir, 0755); err != nil {
-			return "", fmt.Errorf("failed to create output directory: %v", err)
-		}
-	}
-	
-	// 生成输出文件路径
-	taskID := task.ID
-	outputFile := filepath.Join(outputDir, fmt.Sprintf("%s_output.ts", taskID))
-	
-	// 执行FFmpeg命令进行转换
-	args := []string{
-		"-i", source,
-		"-c:v", "libx264",
-		"-c:a", "aac",
-		"-f", "mpegts",
-		"-y", outputFile,
-	}
-	
-	w.logger.Info("执行FFmpeg命令", map[string]string{
-		"args": strings.Join(args, " "),
-	})
-	
-	cmd := exec.CommandContext(w.ctx, "ffmpeg", args...)
-	
-	// 捕获标准输出和错误输出
-	stdout, err := cmd.StdoutPipe()
+	// 使用MaterialPreprocessorService处理任务，以启用日志功能
+	materialPreprocessor := NewMaterialPreprocessorService()
+	err := materialPreprocessor.Process(task)
 	if err != nil {
-		return "", fmt.Errorf("failed to get stdout pipe: %v", err)
+		return "", err
 	}
 	
-	stderr, err := cmd.StderrPipe()
-	if err != nil {
-		return "", fmt.Errorf("failed to get stderr pipe: %v", err)
-	}
-	
-	// 启动命令
-	if err := cmd.Start(); err != nil {
-		return "", fmt.Errorf("failed to start ffmpeg: %v", err)
-	}
-	
-	// 实时读取输出
-	go func() {
-		io.Copy(os.Stdout, stdout)
-	}()
-	
-	go func() {
-		io.Copy(os.Stderr, stderr)
-	}()
-	
-	// 等待命令完成
-	if err := cmd.Wait(); err != nil {
-		return "", fmt.Errorf("ffmpeg execution failed: %v", err)
-	}
-	
-	w.logger.Info("FFmpeg命令执行完成", map[string]string{
-		"outputFile": outputFile,
-	})
-	
-	return outputFile, nil
+	// 返回任务结果
+	return task.Result, nil
 }
 
 // executeVideoEdit 执行视频编辑任务
