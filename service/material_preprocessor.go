@@ -362,59 +362,14 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 
 // convertToTS 使用FFmpeg将视频文件转换为TS格式
 func (s *MaterialPreprocessorService) convertToTS(inputFile, outputFile string) error {
-	// 首先尝试使用硬件加速
-	err := ffmpeg_go.Input(inputFile).
+	return ffmpeg_go.Input(inputFile).
 		Output(outputFile, ffmpeg_go.KwArgs{
-			"c:v":      "h264_nvenc", // NVIDIA NVENC编码器
-			"c:a":      "copy",       // 音频流直接复制
+			"c":        "copy",        // 直接复制编解码器
 			"bsf:v":    "h264_mp4toannexb", // 视频比特流过滤器
-			"f":        "mpegts",     // 输出格式为MPEG-TS
-			"preset":   "fast",       // 快速编码预设
+			"f":        "mpegts",      // 输出格式为MPEG-TS
 		}).
 		OverWriteOutput().
 		Run()
-	
-	// 如果NVIDIA NVENC不可用，尝试Intel Quick Sync
-	if err != nil {
-		err = ffmpeg_go.Input(inputFile).
-			Output(outputFile, ffmpeg_go.KwArgs{
-				"c:v":      "h264_qsv",   // Intel Quick Sync编码器
-				"c:a":      "copy",       // 音频流直接复制
-				"bsf:v":    "h264_mp4toannexb", // 视频比特流过滤器
-				"f":        "mpegts",     // 输出格式为MPEG-TS
-				"preset":   "fast",       // 快速编码预设
-			}).
-			OverWriteOutput().
-			Run()
-	}
-	
-	// 如果Intel Quick Sync也不可用，尝试AMD VCE
-	if err != nil {
-		err = ffmpeg_go.Input(inputFile).
-			Output(outputFile, ffmpeg_go.KwArgs{
-				"c:v":      "h264_amf",   // AMD VCE编码器
-				"c:a":      "copy",       // 音频流直接复制
-				"bsf:v":    "h264_mp4toannexb", // 视频比特流过滤器
-				"f":        "mpegts",     // 输出格式为MPEG-TS
-				"preset":   "fast",       // 快速编码预设
-			}).
-			OverWriteOutput().
-			Run()
-	}
-	
-	// 如果所有硬件加速选项都不可用，回退到软件编码
-	if err != nil {
-		return ffmpeg_go.Input(inputFile).
-			Output(outputFile, ffmpeg_go.KwArgs{
-				"c":        "copy",        // 直接复制编解码器
-				"bsf:v":    "h264_mp4toannexb", // 视频比特流过滤器
-				"f":        "mpegts",      // 输出格式为MPEG-TS
-			}).
-			OverWriteOutput().
-			Run()
-	}
-	
-	return nil
 }
 
 // sendCallback 发送回调通知

@@ -326,10 +326,11 @@ func (ct *ConcurrentTest) runConcurrentTest(concurrentTasks int) error {
 }
 
 func main() {
-	test := NewConcurrentTest("http://localhost:8082")
-	
-	// 运行并发测试，同时处理3个任务
-	if err := test.runConcurrentTest(3); err != nil {
-		fmt.Printf("并发测试失败: %v\n", err)
-	}
+    // 确认 baseURL 正确指向服务的实际地址
+    test := NewConcurrentTest("http://127.0.0.1:8082") // 使用 127.0.0.1 替换 localhost
+    
+    // 运行并发测试，同时处理3个任务
+    if err := test.runConcurrentTest(3); err != nil {
+        fmt.Printf("并发测试失败: %v\n", err)
+    }
 }

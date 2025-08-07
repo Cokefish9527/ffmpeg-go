@@ -507,19 +507,9 @@
             </div>
         </div>
         
-        <div class="tasks-container">
-            <h2 class="section-title">任务列表</h2>
-            <div class="filter-controls">
-                <input type="text" id="searchKeyword" placeholder="任务ID">
-                <select id="searchStatus">
-                    <option value="">所有状态</option>
-                    <option value="pending">待处理</option>
-                    <option value="processing">处理中</option>
-                    <option value="completed">已完成</option>
-                </select>
-                <button onclick="searchTasks()">搜索</button>
-            </div>
-            <table>
+        <div class="card">
+            <h2>任务列表</h2>
+            <table class="task-table">
                 <thead>
                     <tr>
                         <th>任务ID</th>
@@ -527,32 +517,36 @@
                         <th>优先级</th>
                         <th>创建时间</th>
                         <th>执行次数</th>
-                        <th>最后执行时间</th>
+                        <th>最后执行</th>
+                        <th>执行时间</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="taskList">
-                    <!-- 任务列表将在这里显示 -->
+                    <tr>
+                        <td colspan="8" style="text-align: center;">暂无数据</td>
+                    </tr>
                 </tbody>
             </table>
         </div>
         
-        <div class="failed-tasks-container">
-            <h2 class="section-title">失败任务</h2>
-            <table>
+        <div class="card">
+            <h2>失败任务</h2>
+            <table class="task-table">
                 <thead>
                     <tr>
                         <th>任务ID</th>
                         <th>优先级</th>
                         <th>创建时间</th>
                         <th>执行次数</th>
-                        <th>最后执行时间</th>
+                        <th>最后执行</th>
+                        <th>执行时间</th>
                         <th>错误信息</th>
                         <th>操作</th>
                     </tr>
                 </thead>
                 <tbody id="failedTaskList">
-                    <!-- 失败任务列表将在这里显示 -->
+                    <!-- 失败任务列表将通过JavaScript动态填充 -->
                 </tbody>
             </table>
         </div>
@@ -561,20 +555,23 @@
     <!-- 任务执行历史模态框 -->
     <div id="executionModal" class="modal">
         <div class="modal-content">
-            <span class="close" onclick="closeExecutionModal()">&times;</span>
-            <h2>任务执行历史</h2>
+            <div class="modal-header">
+                <h3 class="modal-title">任务执行历史</h3>
+                <span class="close" onclick="closeExecutionModal()">&times;</span>
+            </div>
             <table>
                 <thead>
                     <tr>
-                        <th>执行ID</th>
+                        <th>执行序号</th>
                         <th>状态</th>
                         <th>开始时间</th>
                         <th>结束时间</th>
+                        <th>执行时间</th>
                         <th>错误信息</th>
                     </tr>
                 </thead>
                 <tbody id="executionList">
-                    <!-- 执行历史将在这里显示 -->
+                    <!-- 执行历史将通过JavaScript动态填充 -->
                 </tbody>
             </table>
         </div>
@@ -770,6 +767,25 @@
                         const createdTime = new Date(task.created).toLocaleString();
                         const lastExecutionTime = task.lastExecution ? new Date(task.lastExecution).toLocaleString() : 'N/A';
                         
+                        // 计算任务执行时间
+                        let duration = 'N/A';
+                        if (task.started && task.finished) {
+                            const start = new Date(task.started);
+                            const finish = new Date(task.finished);
+                            const diffMs = finish - start;
+                            const diffSecs = Math.floor(diffMs / 1000);
+                            const diffMins = Math.floor(diffSecs / 60);
+                            const diffHours = Math.floor(diffMins / 60);
+                            
+                            if (diffHours > 0) {
+                                duration = `${diffHours}h ${diffMins % 60}m ${diffSecs % 60}s`;
+                            } else if (diffMins > 0) {
+                                duration = `${diffMins}m ${diffSecs % 60}s`;
+                            } else {
+                                duration = `${diffSecs}s`;
+                            }
+                        }
+                        
                         row.innerHTML = `
                             <td>${task.id}</td>
                             <td class="${statusClass}">${task.status}</td>
@@ -777,12 +793,17 @@
                             <td>${createdTime}</td>
                             <td>${task.executionCount || 1}</td>
                             <td>${lastExecutionTime}</td>
+                            <td>${duration}</td>
                             <td>
-                                <div class="button-group">
-                                    <button class="btn btn-view" onclick="viewExecutions('${task.id}')">查看</button>
-                                    <button class="btn btn-retry" onclick="retryTask('${task.id}')">重试</button>
-                                    <button class="btn btn-discard" onclick="discardTask('${task.id}')">丢弃</button>
-                                </div>
+                                <button class="btn btn-view" onclick="viewExecutions('${task.id}')">查看</button>
+                                ${task.status === 'failed' ? 
+                                    `<button class="btn btn-retry" onclick="retryTask('${task.id}')">重试</button>` : 
+                                    ''
+                                }
+                                ${(task.status === 'failed' || task.status === 'completed') ? 
+                                    `<button class="btn btn-discard" onclick="discardTask('${task.id}')">丢弃</button>` : 
+                                    ''
+                                }
                             </td>
                         `;
                         
@@ -831,12 +852,32 @@
                         const createdTime = new Date(task.created).toLocaleString();
                         const lastExecutionTime = task.lastExecution ? new Date(task.lastExecution).toLocaleString() : 'N/A';
                         
+                        // 计算任务执行时间
+                        let duration = 'N/A';
+                        if (task.started && task.finished) {
+                            const start = new Date(task.started);
+                            const finish = new Date(task.finished);
+                            const diffMs = finish - start;
+                            const diffSecs = Math.floor(diffMs / 1000);
+                            const diffMins = Math.floor(diffSecs / 60);
+                            const diffHours = Math.floor(diffMins / 60);
+                            
+                            if (diffHours > 0) {
+                                duration = `${diffHours}h ${diffMins % 60}m ${diffSecs % 60}s`;
+                            } else if (diffMins > 0) {
+                                duration = `${diffMins}m ${diffSecs % 60}s`;
+                            } else {
+                                duration = `${diffSecs}s`;
+                            }
+                        }
+                        
                         row.innerHTML = `
                             <td>${task.id}</td>
                             <td>${priorityText}</td>
                             <td>${createdTime}</td>
                             <td>${task.executionCount || 1}</td>
                             <td>${lastExecutionTime}</td>
+                            <td>${duration}</td>
                             <td>${task.error || 'N/A'}</td>
                             <td>
                                 <div class="button-group">
@@ -1022,11 +1063,31 @@
                         const startTime = execution.started ? new Date(execution.started).toLocaleString() : 'N/A';
                         const finishTime = execution.finished ? new Date(execution.finished).toLocaleString() : 'N/A';
                         
+                        // 计算执行时间
+                        let duration = 'N/A';
+                        if (execution.started && execution.finished) {
+                            const start = new Date(execution.started);
+                            const finish = new Date(execution.finished);
+                            const diffMs = finish - start;
+                            const diffSecs = Math.floor(diffMs / 1000);
+                            const diffMins = Math.floor(diffSecs / 60);
+                            const diffHours = Math.floor(diffMins / 60);
+                            
+                            if (diffHours > 0) {
+                                duration = `${diffHours}h ${diffMins % 60}m ${diffSecs % 60}s`;
+                            } else if (diffMins > 0) {
+                                duration = `${diffMins}m ${diffSecs % 60}s`;
+                            } else {
+                                duration = `${diffSecs}s`;
+                            }
+                        }
+                        
                         row.innerHTML = `
-                            <td>${execution.id}</td>
+                            <td>${execution.executionNumber}</td>
                             <td class="${statusClass}">${execution.status}</td>
                             <td>${startTime}</td>
                             <td>${finishTime}</td>
+                            <td>${duration}</td>
                             <td>${execution.error || 'N/A'}</td>
                         `;
                         
