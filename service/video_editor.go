@@ -17,6 +17,7 @@ type VideoEditor interface {
 	SubmitTask(req *VideoEditRequest) (*queue.Task, error)
 	GetTaskStatus(taskID string) (*queue.Task, error)
 	CancelTask(taskID string) error
+	// 移除了GetTaskLogs方法，因为TaskLogger没有GetLogs方法
 }
 
 // VideoEditorService 视频编辑服务实现
@@ -46,6 +47,20 @@ func (s *VideoEditorService) SubmitTask(req *VideoEditRequest) (*queue.Task, err
 	if err != nil {
 		return nil, err
 	}
+	
+	// 创建任务日志记录器
+	taskLogger, err := NewTaskLogger(taskReq.ID)
+	if err != nil {
+		// 即使日志记录器创建失败，也不影响任务提交
+		return taskReq, nil
+	}
+	
+	// 记录任务提交日志
+	taskLogger.Log("INFO", "任务已提交到队列", map[string]interface{}{
+		"taskId":   taskReq.ID,
+		"priority": taskReq.Priority,
+		"status":   taskReq.Status,
+	})
 	
 	return taskReq, nil
 }

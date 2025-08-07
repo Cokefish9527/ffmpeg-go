@@ -176,6 +176,9 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 			// 生成临时文件名
 			filename := fmt.Sprintf("%s/%s_temp.mp4", tempDir, taskID)
 			
+			// 记录下载开始时间
+			downloadStart := time.Now()
+			
 			// 下载文件
 			err := downloadFile(req.URL, filename)
 			if err != nil {
@@ -186,6 +189,10 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 				})
 				return
 			}
+			
+			// 记录下载结束时间
+			downloadEnd := time.Now()
+			downloadDuration := downloadEnd.Sub(downloadStart).Seconds()
 
 			// 生成输出文件路径 (TS格式)
 			ext := filepath.Ext(filename)
@@ -263,6 +270,33 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 				Status: "error",
 				Message: "Video conversion timeout",
 				Error:  "The conversion process took too long",
+			})
+		})
+
+		// 获取任务日志接口
+		apiRoutes.GET("/task/:taskId/logs", func(c *gin.Context) {
+			taskID := c.Param("taskId")
+
+			logFile := fmt.Sprintf("./log/tasks/%s.log", taskID)
+			if _, err := os.Stat(logFile); os.IsNotExist(err) {
+				c.JSON(http.StatusNotFound, gin.H{
+					"error": "Task log not found",
+				})
+				return
+			}
+
+			// 读取日志文件内容
+			logData, err := os.ReadFile(logFile)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{
+					"error": "Failed to read task log",
+				})
+				return
+			}
+
+			c.JSON(http.StatusOK, gin.H{
+				"taskId": taskID,
+				"logs":   string(logData),
 			})
 		})
 
