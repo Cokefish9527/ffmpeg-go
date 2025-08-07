@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"fmt"
 	"sync"
 	"time"
 	
@@ -76,55 +77,41 @@ func NewInMemoryTaskQueue() *InMemoryTaskQueue {
 
 // Push 将任务推入队列
 func (tq *InMemoryTaskQueue) Push(task *Task) error {
-	tq.mutex.Lock()
-	defer tq.mutex.Unlock()
-	
-	// 如果任务没有ID，则生成一个
-	if task.ID == "" {
-		task.ID = uuid.New().String()
-	}
-	
-	// 设置默认状态和创建时间
-	if task.Status == "" {
-		task.Status = "pending"
-	}
-	
-	if task.Created.IsZero() {
-		task.Created = time.Now()
-	}
-	
-	// 设置默认优先级
-	if task.Priority == 0 {
-		task.Priority = PriorityNormal
-	}
-	
-	// 初始化执行次数（如果是新任务）
-	if task.ExecutionCount == 0 && task.LastExecution.IsZero() {
-		task.ExecutionCount = 1
-		task.LastExecution = time.Now()
-		// 创建第一条执行记录
-		execution := &TaskExecution{
-			ID:              uuid.New().String(),
-			TaskID:          task.ID,
-			Status:          task.Status,
-			Spec:            task.Spec,
-			Result:          task.Result,
-			Error:           task.Error,
-			Created:         task.Created,
-			Started:         task.Started,
-			Finished:        task.Finished,
-			Progress:        task.Progress,
-			Priority:        task.Priority,
-			ExecutionNumber: task.ExecutionCount,
-		}
-		if tq.executions[task.ID] == nil {
-			tq.executions[task.ID] = make([]*TaskExecution, 0)
-		}
-		tq.executions[task.ID] = append(tq.executions[task.ID], execution)
-	}
-	
-	tq.tasks[task.ID] = task
-	return nil
+    tq.mutex.Lock()
+    defer tq.mutex.Unlock()
+    
+    // 如果任务已经存在且状态为 pending，则不重复添加
+    if existingTask, exists := tq.tasks[task.ID]; exists && existingTask.Status == "pending" {
+        return fmt.Errorf("task with ID %s already exists in pending state", task.ID)
+    }
+
+    // 如果任务没有ID，则生成一个
+    if task.ID == "" {
+        task.ID = uuid.New().String()
+    }
+    
+    // 设置默认状态和创建时间
+    if task.Status == "" {
+        task.Status = "pending"
+    }
+    
+    if task.Created.IsZero() {
+        task.Created = time.Now()
+    }
+    
+    // 设置默认优先级
+    if task.Priority == 0 {
+        task.Priority = PriorityNormal
+    }
+    
+    // 初始化执行次数（如果是新任务）
+    if task.ExecutionCount == 0 && task.LastExecution.IsZero() {
+        task.ExecutionCount = 1
+        task.LastExecution = time.Now()
+    }
+    
+    tq.tasks[task.ID] = task
+    return nil
 }
 
 // Pop 从队列中取出任务
@@ -149,36 +136,8 @@ func (tq *InMemoryTaskQueue) internalPop() (*Task, error) {
 	for priority := PriorityCritical; priority >= PriorityLow; priority-- {
 		for _, task := range tq.tasks {
 			if task.Status == "pending" && task.Priority == priority {
-				// 更新任务状态为处理中
-				task.Status = "processing"
-				task.Started = time.Now()
-				// 不增加执行次数，因为这是任务的第一次执行
-				if task.ExecutionCount == 0 {
-					task.ExecutionCount = 1
-				}
-				task.LastExecution = time.Now()
-				
-				// 创建执行记录
-				execution := &TaskExecution{
-					ID:              uuid.New().String(),
-					TaskID:          task.ID,
-					Status:          task.Status,
-					Spec:            task.Spec,
-					Result:          task.Result,
-					Error:           task.Error,
-					Created:         task.Created,
-					Started:         task.Started,
-					Finished:        task.Finished,
-					Progress:        task.Progress,
-					Priority:        task.Priority,
-					ExecutionNumber: task.ExecutionCount,
-				}
-				if tq.executions[task.ID] == nil {
-					tq.executions[task.ID] = make([]*TaskExecution, 0)
-				}
-				tq.executions[task.ID] = append(tq.executions[task.ID], execution)
-				
-				return task, nil
+				// 更新任务状态为处理中并创建执行记录
+				return tq.processTask(task)
 			}
 		}
 	}
@@ -186,40 +145,48 @@ func (tq *InMemoryTaskQueue) internalPop() (*Task, error) {
 	// 如果没有找到按优先级的任务，返回任意pending任务
 	for _, task := range tq.tasks {
 		if task.Status == "pending" {
-			// 更新任务状态为处理中
-			task.Status = "processing"
-			task.Started = time.Now()
-			// 不增加执行次数，因为这是任务的第一次执行
-			if task.ExecutionCount == 0 {
-				task.ExecutionCount = 1
-			}
-			task.LastExecution = time.Now()
-			
-			// 创建执行记录
-			execution := &TaskExecution{
-				ID:              uuid.New().String(),
-				TaskID:          task.ID,
-				Status:          task.Status,
-				Spec:            task.Spec,
-				Result:          task.Result,
-				Error:           task.Error,
-				Created:         task.Created,
-				Started:         task.Started,
-				Finished:        task.Finished,
-				Progress:        task.Progress,
-				Priority:        task.Priority,
-				ExecutionNumber: task.ExecutionCount,
-			}
-			if tq.executions[task.ID] == nil {
-				tq.executions[task.ID] = make([]*TaskExecution, 0)
-			}
-			tq.executions[task.ID] = append(tq.executions[task.ID], execution)
-			
-			return task, nil
+			// 更新任务状态为处理中并创建执行记录
+			return tq.processTask(task)
 		}
 	}
 	
 	return nil, nil
+}
+
+// processTask 处理任务状态更新和执行记录创建
+func (tq *InMemoryTaskQueue) processTask(task *Task) (*Task, error) {
+	// 更新任务状态为处理中
+	task.Status = "processing"
+	task.Started = time.Now()
+	
+	// 不增加执行次数，因为这是任务的第一次执行
+	if task.ExecutionCount == 0 {
+		task.ExecutionCount = 1
+	}
+	task.LastExecution = time.Now()
+
+	// 创建执行记录
+	execution := &TaskExecution{
+		ID:              uuid.New().String(),
+		TaskID:          task.ID,
+		Status:          task.Status,
+		Spec:            task.Spec,
+		Result:          task.Result,
+		Error:           task.Error,
+		Created:         task.Created,
+		Started:         task.Started,
+		Finished:        task.Finished,
+		Progress:        task.Progress,
+		Priority:        task.Priority,
+		ExecutionNumber: task.ExecutionCount,
+	}
+	
+	if tq.executions[task.ID] == nil {
+		tq.executions[task.ID] = make([]*TaskExecution, 0)
+	}
+	tq.executions[task.ID] = append(tq.executions[task.ID], execution)
+	
+	return task, nil
 }
 
 // GetTaskExecutions 获取任务的所有执行历史

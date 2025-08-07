@@ -1,7 +1,8 @@
-
 package api
 
 import (
+	"net/http"
+	
 	"github.com/gin-gonic/gin"
 )
 
@@ -28,4 +29,12 @@ func GetWorkerPoolStatus(c *gin.Context) {
 // ResizeWorkerPool 调整工作池大小
 func ResizeWorkerPool(c *gin.Context) {
 	// 实现调整工作池大小的逻辑
+}
+
+// GetTaskExecutions 获取任务执行历史
+func GetTaskExecutions(c *gin.Context) {
+	// 实现获取任务执行历史的逻辑
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Task executions",
+	})
 }

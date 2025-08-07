@@ -5,6 +5,9 @@ import (
 	"net/http"
 	"runtime"
 	"time"
+	"os"
+	"path/filepath"
+	"io/ioutil"
 
 	"github.com/gin-gonic/gin"
 	"github.com/shirou/gopsutil/v3/cpu"
@@ -548,4 +551,50 @@ func (m *MonitorAPI) GetTaskExecutions(c *gin.Context) {
 	utils.Info("任务执行历史获取成功", map[string]string{"taskId": taskID})
 	c.JSON(http.StatusOK, executions)
 
+}
+
+// GetTaskLog 获取任务日志
+func (m *MonitorAPI) GetTaskLog(c *gin.Context) {
+	utils.Debug("收到任务日志请求", map[string]string{"clientIP": c.ClientIP()})
+
+	taskID := c.Param("taskId")
+	if taskID == "" {
+		utils.Warn("任务ID不能为空", nil)
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Task ID is required",
+		})
+		return
+	}
+
+	// 构建日志文件路径
+	logDir := "./log/tasks"
+	logFile := filepath.Join(logDir, fmt.Sprintf("%s.log", taskID))
+
+	// 检查日志文件是否存在
+	if _, err := os.Stat(logFile); os.IsNotExist(err) {
+		utils.Warn("任务日志文件不存在", map[string]string{"taskId": taskID})
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Task log not found",
+		})
+		return
+	}
+
+	// 读取日志文件内容
+	content, err := ioutil.ReadFile(logFile)
+	if err != nil {
+		utils.Error("读取任务日志文件失败", map[string]string{
+			"taskId": taskID,
+			"error":  err.Error(),
+		})
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to read task log",
+		})
+		return
+	}
+
+	utils.Info("任务日志获取成功", map[string]string{"taskId": taskID})
+	c.JSON(http.StatusOK, gin.H{
+		"taskId": taskID,
+		"log":    string(content),
+	})
 }

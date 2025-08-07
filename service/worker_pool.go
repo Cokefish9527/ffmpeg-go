@@ -200,36 +200,32 @@ func (w *Worker) setActive(active bool) {
 
 // processTask 处理任务
 func (w *Worker) processTask(task *queue.Task) {
-	// 标记工作者为活跃状态
-	w.setActive(true)
-	defer w.setActive(false)
-	defer utils.HandlePanic()
-	
-	w.logger.Info("开始处理任务", map[string]string{
-		"taskId": task.ID,
-		"status": task.Status,
-	})
-	
-	// 更新任务状态为处理中
-	task.Status = "processing"
-	task.Started = time.Now()
-	task.Progress = 0.0
-	
-	// 更新任务到队列
-	if err := w.taskQueue.Update(task); err != nil {
-		w.logger.Error("更新任务状态失败", map[string]string{
-			"taskId": task.ID,
-			"error":  err.Error(),
-		})
-		return
-	}
-	
-	// 标记任务正在处理
-	markTaskAsBeingProcessed(task.ID, true)
-	defer markTaskAsBeingProcessed(task.ID, false)
-	
-	// 执行任务处理
-	result, err := w.executeTask(task)
+    // 标记工作者为活跃状态
+    w.setActive(true)
+    defer w.setActive(false)
+    defer utils.HandlePanic()
+    
+    w.logger.Info("开始处理任务", map[string]string{
+        "taskId": task.ID,
+        "status": task.Status,
+    })
+    
+    // 更新任务状态为处理中
+    task.Status = "processing"
+    task.Started = time.Now()
+    task.Progress = 0.0
+    
+    // 更新任务到队列
+    if err := w.taskQueue.Update(task); err != nil {
+        w.logger.Error("更新任务状态失败", map[string]string{
+            "taskId": task.ID,
+            "error":  err.Error(),
+        })
+        return
+    }
+    
+    // 执行任务处理
+    result, err := w.executeTask(task)
 	
 	// 更新任务完成状态
 	task.Finished = time.Now()
@@ -271,9 +267,11 @@ func (w *Worker) executeTask(task *queue.Task) (string, error) {
         return "", fmt.Errorf("invalid task type")
     }
 
-    // 生成任务ID
-    taskID := fmt.Sprintf("m-%s", uuid.New().String())
-    task.ID = taskID
+    // 如果任务ID为空，则生成新的任务ID
+    if task.ID == "" {
+        taskID := fmt.Sprintf("m-%s", uuid.New().String())
+        task.ID = taskID
+    }
 
     w.logger.Info("执行任务", map[string]string{
         "taskId":   task.ID,

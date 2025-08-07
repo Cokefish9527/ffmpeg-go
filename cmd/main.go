@@ -7,10 +7,10 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/u2takey/ffmpeg-go/api"
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
-	"github.com/google/uuid"
 )
 
 // TaskStatusResponse 任务状态响应
@@ -76,29 +76,29 @@ var (
 func main() {
 	// 初始化任务队列
 	taskQueue = queue.NewInMemoryTaskQueue()
-	
+
 	// 初始化视频编辑服务
 	editorService = service.NewVideoEditorService(taskQueue)
-	
+
 	// 初始化工作池
 	workerPool = service.NewWorkerPool(5, taskQueue)
-	
+
 	// 初始化监控API
 	monitorAPI = api.NewMonitorAPI(taskQueue, workerPool)
-	
+
 	// 启动工作池
 	workerPool.Start()
-	
+
 	// 确保程序退出时停止工作池
 	defer workerPool.Stop()
-	
+
 	// 启动HTTP服务器
 	router := gin.Default()
-	
+
 	// 提供静态文件服务
 	router.StaticFile("/", "./web/index.html")
 	router.Static("/static", "./web")
-	
+
 	v1 := router.Group("/api/v1")
 	{
 		v1.POST("/video/edit", api.SubmitVideoEdit)
@@ -106,20 +106,21 @@ func main() {
 		v1.DELETE("/video/edit/:id", api.CancelVideoEdit)
 		v1.GET("/workerpool/status", api.GetWorkerPoolStatus)
 		v1.POST("/workerpool/resize", api.ResizeWorkerPool)
-		
+
 		// 添加监控接口
 		v1.GET("/monitor/stats", monitorAPI.GetSystemStats)
 		v1.GET("/monitor/tasks/stats", monitorAPI.GetTaskStats)
 		v1.GET("/monitor/tasks", monitorAPI.GetTasks)
 		v1.GET("/monitor/tasks/:taskId", monitorAPI.GetTaskDetail)
 		v1.GET("/monitor/tasks/:taskId/executions", monitorAPI.GetTaskExecutions)
+		v1.GET("/monitor/tasks/:taskId/log", monitorAPI.GetTaskLog) // 添加获取任务日志的接口
 		v1.GET("/monitor/workers", monitorAPI.GetWorkerStats)
-		
+
 		// 添加任务管理接口
 		v1.POST("/monitor/tasks/retry", monitorAPI.RetryTask)
 		v1.POST("/monitor/tasks/cancel", monitorAPI.CancelTask)
 		v1.POST("/monitor/tasks/discard", monitorAPI.DiscardTask)
-		
+
 		// 视频URL处理接口
 		v1.POST("/video/url", func(c *gin.Context) {
 			var req VideoURLRequest
@@ -152,7 +153,7 @@ func main() {
 
 			// 生成临时文件名
 			filename := fmt.Sprintf("%s/%s_temp.mp4", tempDir, taskID)
-			
+
 			// 下载文件
 			err := downloadFile(req.URL, filename)
 			if err != nil {
@@ -194,7 +195,7 @@ func main() {
 			// 简单示例：处理视频URL
 			// 在实际应用中，这里会启动HTTP服务器来处理API请求
 			fmt.Println("Video processing service started")
-			
+
 			c.JSON(http.StatusOK, VideoURLResponse{
 				Status:     "success",
 				Message:    "Video converted successfully",
@@ -202,7 +203,7 @@ func main() {
 			})
 		})
 	}
-	
+
 	// 启动HTTP服务器监听8082端口
 	if err := router.Run(":8082"); err != nil {
 		fmt.Printf("Failed to start HTTP server: %v\n", err)

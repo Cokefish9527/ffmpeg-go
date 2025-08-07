@@ -25,14 +25,14 @@ type TaskLogger struct {
 
 // VideoProperties 视频属性信息
 type VideoProperties struct {
-	FileName      string  `json:"fileName"`
-	Duration      float64 `json:"duration"`
-	Width         int     `json:"width"`
-	Height        int     `json:"height"`
-	Codec         string  `json:"codec"`
-	Bitrate       string  `json:"bitrate"`
-	Size          int64   `json:"size"`
-	Format        string  `json:"format"`
+	FileName string  `json:"fileName"`
+	Duration float64 `json:"duration"`
+	Width    int     `json:"width"`
+	Height   int     `json:"height"`
+	Codec    string  `json:"codec"`
+	Bitrate  string  `json:"bitrate"`
+	Size     int64   `json:"size"`
+	Format   string  `json:"format"`
 }
 
 // NewTaskLogger 创建任务日志记录器
@@ -185,10 +185,10 @@ type MaterialPreprocessor interface {
 
 // CallbackRequest 回调请求结构
 type CallbackRequest struct {
-	TaskID   string `json:"taskId"`
-	Status   string `json:"status"`
-	Result   string `json:"result,omitempty"`
-	Error    string `json:"error,omitempty"`
+	TaskID string `json:"taskId"`
+	Status string `json:"status"`
+	Result string `json:"result,omitempty"`
+	Error  string `json:"error,omitempty"`
 }
 
 // MaterialPreprocessorService 素材预处理器服务
@@ -259,8 +259,8 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 		fileCheckDuration := time.Since(fileCheckStart).Seconds()
 		if taskLogger != nil {
 			taskLogger.Log("ERROR", "源文件不存在", map[string]interface{}{
-				"source": source,
-				"error":  err.Error(),
+				"source":   source,
+				"error":    err.Error(),
 				"duration": fileCheckDuration,
 			})
 		}
@@ -271,7 +271,7 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "源文件检查完成", map[string]interface{}{
-			"source": source,
+			"source":   source,
 			"duration": fileCheckDuration,
 		})
 	}
@@ -285,7 +285,7 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "输出路径生成完成", map[string]interface{}{
 			"outputFile": outputFile,
-			"duration": pathGenDuration,
+			"duration":   pathGenDuration,
 		})
 	}
 
@@ -322,9 +322,9 @@ func (s *MaterialPreprocessorService) Process(task *queue.Task) error {
 
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "任务处理完成", map[string]interface{}{
-			"totalDuration": totalDuration,
-			"fileCheckDuration": fileCheckDuration,
-			"pathGenDuration": pathGenDuration,
+			"totalDuration":      totalDuration,
+			"fileCheckDuration":  fileCheckDuration,
+			"pathGenDuration":    pathGenDuration,
 			"conversionDuration": conversionDuration,
 		})
 	}
@@ -346,9 +346,9 @@ func (s *MaterialPreprocessorService) convertToTS(inputFile, outputFile string, 
 
 	ffmpeg := ffmpeg_go.Input(inputFile).
 		Output(outputFile, ffmpeg_go.KwArgs{
-			"c":        "copy",        // 直接复制编解码器
-			"bsf:v":    "h264_mp4toannexb", // 视频比特流过滤器
-			"f":        "mpegts",      // 输出格式为MPEG-TS
+			"c":     "copy",             // 直接复制编解码器
+			"bsf:v": "h264_mp4toannexb", // 视频比特流过滤器
+			"f":     "mpegts",           // 输出格式为MPEG-TS
 		}).
 		OverWriteOutput()
 
@@ -367,7 +367,7 @@ func (s *MaterialPreprocessorService) convertToTS(inputFile, outputFile string, 
 	if taskLogger != nil {
 		taskLogger.Log("INFO", "FFmpeg执行完成", map[string]interface{}{
 			"duration": execDuration,
-			"success": err == nil,
+			"success":  err == nil,
 		})
 	}
 
@@ -408,7 +408,7 @@ func (s *MaterialPreprocessorService) sendCallback(task *queue.Task, status, res
 		return
 	}
 	defer resp.Body.Close()
-	
+
 	// 可以根据需要处理响应，这里简单地忽略
 	_ = resp
 }
