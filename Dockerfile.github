@@ -1,5 +1,5 @@
 # 使用官方Golang镜像作为构建阶段的基础镜像
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
 
 # 安装 git
 RUN apk add --no-cache git
@@ -15,8 +15,13 @@ RUN git clone https://github.com/Cokefish9527/ffmpeg-go.git ./src
 # 设置工作目录到源代码目录
 WORKDIR /app/src
 
-# 下载依赖
-RUN go mod download && go mod verify
+# 清理模块缓存并重新整理依赖
+RUN go clean -modcache && go mod tidy
+
+# 设置GOPROXY并下载依赖
+RUN go env -w GOPROXY=https://proxy.golang.org,direct && \
+    go mod download && \
+    go mod verify
 
 # 构建应用
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o /app/ffmpeg-go cmd/main.go
