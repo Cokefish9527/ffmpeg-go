@@ -29,7 +29,7 @@ type TaskExecution struct {
     Created         time.Time     `json:"created"`
     Started         time.Time     `json:"started"`
     Finished        time.Time     `json:"finished"`
-    ExecutionTime   float64       `json:"executionTime"` // 添加 ExecutionTime 字段
+    ExecutionTime   int64         `json:"executionTime"` // 修改为int64类型，表示毫秒
     Progress        float64       `json:"progress"`
     Priority        TaskPriority  `json:"priority"`
     ExecutionNumber int           `json:"executionNumber"` // 执行序号
@@ -258,10 +258,10 @@ func (tq *InMemoryTaskQueue) Update(task *Task) error {
             ExecutionNumber: task.ExecutionCount,
         }
         
-        // 如果任务完成或失败，设置结束时间和执行时间
+        // 如果任务完成或失败，设置结束时间和执行时间（转换为毫秒）
         if task.Status == "completed" || task.Status == "failed" {
             newExecution.Finished = time.Now()
-            newExecution.ExecutionTime = newExecution.Finished.Sub(newExecution.Started).Seconds() // 计算并设置执行时间
+            newExecution.ExecutionTime = int64(newExecution.Finished.Sub(newExecution.Started).Milliseconds()) // 计算并设置执行时间（毫秒）
         }
         
         tq.executions[task.ID] = append(tq.executions[task.ID], newExecution)
@@ -271,7 +271,7 @@ func (tq *InMemoryTaskQueue) Update(task *Task) error {
         latestExecution.Status = task.Status
         if task.Status == "completed" || task.Status == "failed" {
             latestExecution.Finished = time.Now()
-            latestExecution.ExecutionTime = latestExecution.Finished.Sub(latestExecution.Started).Seconds() // 计算并设置执行时间
+            latestExecution.ExecutionTime = int64(latestExecution.Finished.Sub(latestExecution.Started).Milliseconds()) // 计算并设置执行时间（毫秒）
         }
         latestExecution.Error = task.Error
     }
