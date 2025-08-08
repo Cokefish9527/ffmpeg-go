@@ -124,14 +124,14 @@ func (o *OSSManager) ListObjects(prefix string, maxKeys int) ([]OSSObject, error
 			Name:         "example1.mp4",
 			Size:         1024000,
 			LastModified: time.Now().Add(-2 * time.Hour),
-			URL:          fmt.Sprintf("https://%s.%s/example1.mp4", o.BucketName, o.Endpoint),
+			URL:          fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, "example1.mp4"),
 		},
 		{
 			Name:         "example2.mp4",
 			Size:         2048000,
 			LastModified: time.Now().Add(-1 * time.Hour),
 			// 注意：实际的OSS endpoint格式可能不同
-			URL: fmt.Sprintf("https://%s.%s/example2.mp4", o.BucketName, o.Endpoint),
+			URL: fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, "example2.mp4"),
 		},
 	}
 	

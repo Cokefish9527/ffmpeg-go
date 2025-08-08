@@ -7,13 +7,15 @@ import (
 	"os"
 	"path/filepath"
 
+	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/google/uuid"
 )
 
 // OSSService 提供基于阿里云OSS的实际服务实现
 type OSSService struct {
-	// 实际实现中会包含阿里云OSS客户端
-	// 由于需要安装SDK，暂时只提供接口定义
+	client     *oss.Client
+	bucketName string
+	bucket     *oss.Bucket
 }
 
 // NewOSSService 创建一个新的OSS服务实例
@@ -23,11 +25,22 @@ func NewOSSService(endpoint, accessKeyID, accessKeySecret, bucketName string) (*
 		return nil, nil
 	}
 
-	// 在实际实现中，这里会初始化阿里云OSS客户端
-	// 需要先通过 go get github.com/aliyun/aliyun-oss-go-sdk/oss 安装SDK
+	// 创建OSS客户端
+	client, err := oss.New(endpoint, accessKeyID, accessKeySecret)
+	if err != nil {
+		return nil, fmt.Errorf("创建OSS客户端失败: %w", err)
+	}
+
+	// 获取存储空间
+	bucket, err := client.Bucket(bucketName)
+	if err != nil {
+		return nil, fmt.Errorf("获取存储空间失败: %w", err)
+	}
 
 	return &OSSService{
-		// 实际实现中会初始化客户端和存储空间
+		client:     client,
+		bucketName: bucketName,
+		bucket:     bucket,
 	}, nil
 }
 
@@ -54,35 +67,76 @@ func (o *OSSService) UploadFile(file multipart.File, header *multipart.FileHeade
 		return "", fmt.Errorf("保存临时文件失败: %w", err)
 	}
 
-	// 在实际实现中，这里会使用阿里云OSS SDK上传文件
-	// 暂时返回模拟的URL
-	url := fmt.Sprintf("https://%s.oss.aliyuncs.com/%s", "your-bucket-name", fileName)
+	// 重新打开临时文件以供上传
+	tempFile, err = os.Open(tempFilePath)
+	if err != nil {
+		return "", fmt.Errorf("打开临时文件失败: %w", err)
+	}
+	defer tempFile.Close()
+
+	// 上传到OSS
+	err = o.bucket.PutObject(fileName, tempFile)
+	if err != nil {
+		return "", fmt.Errorf("上传文件到OSS失败: %w", err)
+	}
+
+	// 构造文件URL
+	url := fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, fileName)
 	return url, nil
 }
 
 // DownloadFile 从OSS下载文件
 func (o *OSSService) DownloadFile(objectName string, localFilePath string) error {
-	// 在实际实现中，这里会使用阿里云OSS SDK下载文件
-	// 暂时返回模拟实现
+	// 下载文件
+	err := o.bucket.GetObjectToFile(objectName, localFilePath)
+	if err != nil {
+		return fmt.Errorf("从OSS下载文件失败: %w", err)
+	}
 	return nil
 }
 
 // ListObjects 列出存储空间中的对象
 func (o *OSSService) ListObjects(prefix string, maxKeys int) ([]OSSObject, error) {
-	// 在实际实现中，这里会使用阿里云OSS SDK列举对象
-	// 暂时返回模拟数据
-	objects := make([]OSSObject, 0)
+	// 设置列举选项
+	options := []oss.Option{
+		oss.MaxKeys(maxKeys),
+	}
+	
+	if prefix != "" {
+		options = append(options, oss.Prefix(prefix))
+	}
+
+	// 列举对象
+	lor, err := o.bucket.ListObjects(options...)
+	if err != nil {
+		return nil, fmt.Errorf("列举OSS对象失败: %w", err)
+	}
+
+	// 转换为统一格式
+	objects := make([]OSSObject, len(lor.Objects))
+	for i, obj := range lor.Objects {
+		objects[i] = OSSObject{
+			Name:         obj.Key,
+			Size:         obj.Size,
+			LastModified: obj.LastModified,
+			URL:          fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, obj.Key),
+		}
+	}
+
 	return objects, nil
 }
 
 // DeleteObject 删除OSS中的对象
 func (o *OSSService) DeleteObject(objectName string) error {
-	// 在实际实现中，这里会使用阿里云OSS SDK删除对象
-	// 暂时返回模拟实现
+	// 删除对象
+	err := o.bucket.DeleteObject(objectName)
+	if err != nil {
+		return fmt.Errorf("删除OSS对象失败: %w", err)
+	}
 	return nil
 }
 
 // GetObjectURL 获取对象的访问URL
 func (o *OSSService) GetObjectURL(objectName string) string {
-	return fmt.Sprintf("https://%s.oss.aliyuncs.com/%s", "your-bucket-name", objectName)
+	return fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, objectName)
 }
