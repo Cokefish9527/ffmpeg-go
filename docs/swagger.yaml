@@ -19,6 +19,13 @@ definitions:
         description: SecretKey
         type: string
     type: object
+  api.SmartUploadResponse:
+    properties:
+      message:
+        type: string
+      url:
+        type: string
+    type: object
   api.SystemStats:
     description: 系统统计信息
     properties:
@@ -821,6 +828,46 @@ paths:
               type: string
             type: object
       summary: 获取视频编辑任务状态
+      tags:
+      - video
+  /video/smart-upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: |-
+        接收文件流，判断是否是视频文件，如果不是视频文件，直接上传到OSS，
+        如果是视频文件，转换为TS格式后上传到OSS。文件会根据用户ID存放到专属目录中。
+      parameters:
+      - description: 用户ID
+        in: query
+        name: userId
+        required: true
+        type: string
+      - description: 要上传的文件
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 文件上传成功
+          schema:
+            $ref: '#/definitions/api.SmartUploadResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 智能文件上传
       tags:
       - video
   /video/url:

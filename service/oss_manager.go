@@ -61,41 +61,41 @@ func NewOSSManager(config OSSConfig) *OSSManager {
 
 // UploadFile 上传文件到OSS
 func (o *OSSManager) UploadFile(file multipart.File, header *multipart.FileHeader) (string, error) {
-	// 如果有真实的OSS服务，则使用真实服务
-	if o.ossService != nil {
-		return o.ossService.UploadFile(file, header)
-	}
-	
-	// 否则使用模拟实现
-	// 生成唯一文件名
-	fileExt := filepath.Ext(header.Filename)
-	fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
-	
-	// 创建临时文件
-	tempDir := os.TempDir()
-	tempFilePath := filepath.Join(tempDir, fileName)
-	
-	tempFile, err := os.Create(tempFilePath)
-	if err != nil {
-		return "", fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	defer tempFile.Close()
-	defer os.Remove(tempFilePath) // 清理临时文件
-	
-	// 将上传的文件内容复制到临时文件
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
-		return "", fmt.Errorf("保存临时文件失败: %w", err)
-	}
-	
-	// 在实际实现中，这里会使用阿里云OSS SDK上传文件
-	// 由于需要配置真实的访问凭证，暂时返回模拟的URL
-	ossURL := fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, fileName)
-	
-	// 模拟上传过程
-	time.Sleep(100 * time.Millisecond)
-	
-	return ossURL, nil
+    // 如果有真实的OSS服务，则使用真实服务
+    if o.ossService != nil {
+        return o.ossService.UploadFile(file, header)
+    }
+    
+    // 否则使用模拟实现
+    // 生成唯一文件名
+    fileExt := filepath.Ext(header.Filename)
+    fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
+    
+    // 创建临时文件
+    tempDir := os.TempDir()
+    tempFilePath := filepath.Join(tempDir, fileName)
+    
+    tempFile, err := os.Create(tempFilePath)
+    if err != nil {
+        return "", fmt.Errorf("创建临时文件失败: %w", err)
+    }
+    defer tempFile.Close()
+    defer os.Remove(tempFilePath) // 清理临时文件
+    
+    // 将上传的文件内容复制到临时文件
+    _, err = io.Copy(tempFile, file)
+    if err != nil {
+        return "", fmt.Errorf("保存临时文件失败: %w", err)
+    }
+    
+    // 在实际实现中，这里会使用阿里云OSS SDK上传文件
+    // 由于需要配置真实的访问凭证，暂时返回模拟的URL
+    ossURL := fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, header.Filename) // 修改此处，使用header.Filename作为对象Key
+    
+    // 模拟上传过程
+    time.Sleep(100 * time.Millisecond)
+    
+    return ossURL, nil
 }
 
 // DownloadFile 从OSS下载文件

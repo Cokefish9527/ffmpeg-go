@@ -2,13 +2,9 @@ package service
 
 import (
 	"fmt"
-	"io"
 	"mime/multipart"
-	"os"
-	"path/filepath"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
-	"github.com/google/uuid"
 )
 
 // OSSService 提供基于阿里云OSS的实际服务实现
@@ -46,43 +42,18 @@ func NewOSSService(endpoint, accessKeyID, accessKeySecret, bucketName string) (*
 
 // UploadFile 上传文件到OSS
 func (o *OSSService) UploadFile(file multipart.File, header *multipart.FileHeader) (string, error) {
-	// 生成唯一文件名
-	fileExt := filepath.Ext(header.Filename)
-	fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
+    // 使用header.Filename作为对象Key
+    objectKey := header.Filename
 
-	// 创建临时文件
-	tempDir := os.TempDir()
-	tempFilePath := filepath.Join(tempDir, fileName)
+    // 上传到OSS
+    err := o.bucket.PutObject(objectKey, file)
+    if err != nil {
+        return "", fmt.Errorf("上传文件到OSS失败: %w", err)
+    }
 
-	tempFile, err := os.Create(tempFilePath)
-	if err != nil {
-		return "", fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	defer tempFile.Close()
-	defer os.Remove(tempFilePath) // 清理临时文件
-
-	// 将上传的文件内容复制到临时文件
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
-		return "", fmt.Errorf("保存临时文件失败: %w", err)
-	}
-
-	// 重新打开临时文件以供上传
-	tempFile, err = os.Open(tempFilePath)
-	if err != nil {
-		return "", fmt.Errorf("打开临时文件失败: %w", err)
-	}
-	defer tempFile.Close()
-
-	// 上传到OSS
-	err = o.bucket.PutObject(fileName, tempFile)
-	if err != nil {
-		return "", fmt.Errorf("上传文件到OSS失败: %w", err)
-	}
-
-	// 构造文件URL
-	url := fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, fileName)
-	return url, nil
+    // 构造文件URL
+    url := fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, objectKey)
+    return url, nil
 }
 
 // DownloadFile 从OSS下载文件

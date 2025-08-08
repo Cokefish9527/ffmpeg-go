@@ -818,6 +818,63 @@ const docTemplate = `{
                 }
             }
         },
+        "/video/smart-upload": {
+            "post": {
+                "description": "接收文件流，判断是否是视频文件，如果不是视频文件，直接上传到OSS，\n如果是视频文件，转换为TS格式后上传到OSS。文件会根据用户ID存放到专属目录中。",
+                "consumes": [
+                    "multipart/form-data"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "video"
+                ],
+                "summary": "智能文件上传",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "用户ID",
+                        "name": "userId",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "file",
+                        "description": "要上传的文件",
+                        "name": "file",
+                        "in": "formData",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "文件上传成功",
+                        "schema": {
+                            "$ref": "#/definitions/api.SmartUploadResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "请求参数错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "内部服务器错误",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/video/url": {
             "post": {
                 "description": "通过URL下载视频并提交处理任务",
@@ -980,6 +1037,17 @@ const docTemplate = `{
                 },
                 "secretKey": {
                     "description": "SecretKey",
+                    "type": "string"
+                }
+            }
+        },
+        "api.SmartUploadResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "url": {
                     "type": "string"
                 }
             }

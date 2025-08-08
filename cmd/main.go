@@ -145,6 +145,11 @@ func main() {
 		v1.POST("/video/url", func(c *gin.Context) {
 			api.HandleVideoURL(c, taskQueue)
 		})
+		
+		// 智能上传接口 - 根据文件类型决定处理方式
+		v1.POST("/video/smart-upload", func(c *gin.Context) {
+			api.SmartUpload(c, ossManager)
+		})
 	}
 
 	// 启动HTTP服务器监听8084端口
