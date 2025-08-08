@@ -42,8 +42,20 @@ func NewOSSService(endpoint, accessKeyID, accessKeySecret, bucketName string) (*
 
 // UploadFile 上传文件到OSS
 func (o *OSSService) UploadFile(file multipart.File, header *multipart.FileHeader) (string, error) {
-    // 使用header.Filename作为对象Key
+    return o.UploadFileWithPath(file, header, "")
+}
+
+// UploadFileWithPath 上传文件到OSS指定路径
+func (o *OSSService) UploadFileWithPath(file multipart.File, header *multipart.FileHeader, path string) (string, error) {
+    // 构造对象Key，包含路径
     objectKey := header.Filename
+    if path != "" {
+        // 确保路径以'/'结尾
+        if path[len(path)-1] != '/' {
+            path += "/"
+        }
+        objectKey = path + header.Filename
+    }
 
     // 上传到OSS
     err := o.bucket.PutObject(objectKey, file)

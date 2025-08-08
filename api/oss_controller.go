@@ -26,6 +26,7 @@ func NewOSSController(ossManager *service.OSSManager) *OSSController {
 // @Accept mpfd
 // @Produce json
 // @Param file formData file true "要上传的文件" format(binary)
+// @Param path formData string false "上传路径，如: videos/2023/10/" default("")
 // @Success 200 {object} map[string]interface{} "文件上传成功" {message=string,url=string}
 // @Failure 400 {object} map[string]string "请求参数错误" {error=string}
 // @Failure 500 {object} map[string]string "内部服务器错误" {error=string}
@@ -41,8 +42,11 @@ func (o *OSSController) UploadFile(c *gin.Context) {
 	}
 	defer file.Close()
 
+	// 获取上传路径参数
+	path := c.PostForm("path")
+	
 	// 上传文件到OSS
-	url, err := o.ossManager.UploadFile(file, header)
+	url, err := o.ossManager.UploadFileWithPath(file, header, path)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "文件上传失败: " + err.Error(),

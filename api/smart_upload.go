@@ -118,14 +118,8 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 		}
 		defer tempFile.Close()
 
-		// 创建一个新的multipart.FileHeader以供OSS上传
-		newHeader := &multipart.FileHeader{
-			Filename: filepath.Join(userID, header.Filename), // 确保userID作为目录前缀
-			Size:     header.Size,
-		}
-
-		// 直接上传到OSS
-		url, err = ossManager.UploadFile(tempFile, newHeader)
+·		// 直接上传到OSS，使用用户ID作为目录
+		url, err = ossManager.UploadFileWithPath(tempFile, header, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "文件上传失败: " + err.Error(),
@@ -196,9 +190,6 @@ func processVideoFile(inputPath, originalFilename, userID string, ossManager *se
 	ext := filepath.Ext(originalFilename)
 	nameWithoutExt := strings.TrimSuffix(originalFilename, ext)
 	outputFilename := fmt.Sprintf("%s.ts", nameWithoutExt)
-	
-	// 确保输出文件名也包含用户ID目录
-	outputFilenameWithPath := filepath.Join(userID, outputFilename) // 确保userID作为目录前缀
     
     // 修正outputPath的生成方式
     outputPath := filepath.Join(filepath.Dir(inputPath), fmt.Sprintf("%s%s", uuid.New().String(), ".ts"))
@@ -236,12 +227,12 @@ func processVideoFile(inputPath, originalFilename, userID string, ossManager *se
 
 	// 创建multipart.FileHeader
 	newHeader := &multipart.FileHeader{
-		Filename: outputFilenameWithPath, // 确保userID作为目录前缀
+		Filename: outputFilename,
 		Size:     fileInfo.Size(),
 	}
 
-	// 上传到OSS
-	url, err := ossManager.UploadFile(convertedFile, newHeader)
+	// 上传到OSS，使用用户ID作为目录
+	url, err := ossManager.UploadFileWithPath(convertedFile, newHeader, userID)
 	if err != nil {
 		return "", fmt.Errorf("上传文件到OSS失败: %w", err)
 	}

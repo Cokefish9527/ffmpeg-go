@@ -61,9 +61,14 @@ func NewOSSManager(config OSSConfig) *OSSManager {
 
 // UploadFile 上传文件到OSS
 func (o *OSSManager) UploadFile(file multipart.File, header *multipart.FileHeader) (string, error) {
+    return o.UploadFileWithPath(file, header, "")
+}
+
+// UploadFileWithPath 上传文件到OSS指定路径
+func (o *OSSManager) UploadFileWithPath(file multipart.File, header *multipart.FileHeader, path string) (string, error) {
     // 如果有真实的OSS服务，则使用真实服务
     if o.ossService != nil {
-        return o.ossService.UploadFile(file, header)
+        return o.ossService.UploadFileWithPath(file, header, path)
     }
     
     // 否则使用模拟实现
@@ -90,7 +95,7 @@ func (o *OSSManager) UploadFile(file multipart.File, header *multipart.FileHeade
     
     // 在实际实现中，这里会使用阿里云OSS SDK上传文件
     // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    ossURL := fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, header.Filename) // 修改此处，使用header.Filename作为对象Key
+    ossURL := fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, filepath.Join(path, header.Filename)) // 修改此处，使用path和header.Filename作为对象Key
     
     // 模拟上传过程
     time.Sleep(100 * time.Millisecond)
