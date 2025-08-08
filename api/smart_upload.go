@@ -118,7 +118,7 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 		}
 		defer tempFile.Close()
 
-·		// 直接上传到OSS，使用用户ID作为目录
+		// 直接上传到OSS，使用用户ID作为目录
 		url, err = ossManager.UploadFileWithPath(tempFile, header, userID)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -186,12 +186,12 @@ func isVideoFile(filePath string) (bool, error) {
 func processVideoFile(inputPath, originalFilename, userID string, ossManager *service.OSSManager) (string, error) {
 	fmt.Printf("开始处理视频文件: %s\n", inputPath)
 	
-	// 生成输出文件路径（TS格式）
+	// 生成输出文件路径（TS格式）使用UUID确保唯一性
 	ext := filepath.Ext(originalFilename)
 	nameWithoutExt := strings.TrimSuffix(originalFilename, ext)
-	outputFilename := fmt.Sprintf("%s.ts", nameWithoutExt)
-    
-    // 修正outputPath的生成方式
+	outputFilename := fmt.Sprintf("%s_%s.ts", nameWithoutExt, uuid.New().String())
+	
+	// 修正outputPath的生成方式
     outputPath := filepath.Join(filepath.Dir(inputPath), fmt.Sprintf("%s%s", uuid.New().String(), ".ts"))
 	
 	fmt.Printf("输入文件: %s, 输出文件: %s\n", inputPath, outputPath)

@@ -3,8 +3,10 @@ package service
 import (
 	"fmt"
 	"mime/multipart"
+	"path/filepath"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/google/uuid"
 )
 
 // OSSService 提供基于阿里云OSS的实际服务实现
@@ -47,14 +49,18 @@ func (o *OSSService) UploadFile(file multipart.File, header *multipart.FileHeade
 
 // UploadFileWithPath 上传文件到OSS指定路径
 func (o *OSSService) UploadFileWithPath(file multipart.File, header *multipart.FileHeader, path string) (string, error) {
-    // 构造对象Key，包含路径
-    objectKey := header.Filename
+    // 生成唯一文件名，避免文件名重复
+    fileExt := filepath.Ext(header.Filename)
+    uniqueFileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
+    
+    // 构造对象Key，包含路径和唯一文件名
+    objectKey := uniqueFileName
     if path != "" {
         // 确保路径以'/'结尾
         if path[len(path)-1] != '/' {
             path += "/"
         }
-        objectKey = path + header.Filename
+        objectKey = path + uniqueFileName
     }
 
     // 上传到OSS
