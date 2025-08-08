@@ -8,11 +8,11 @@ import (
 	"os"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"github.com/u2takey/ffmpeg-go/api"
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
-	swaggerFiles "github.com/swaggo/files"
-	"github.com/swaggo/gin-swagger"
 
 	// 导入swagger文档
 	_ "github.com/u2takey/ffmpeg-go/docs"
@@ -74,7 +74,7 @@ func listObjects(c *gin.Context) {
 // @Description 根据对象名称删除OSS中的对象。注意：删除操作不可逆，请谨慎操作。
 // @Tags oss
 // @Produce json
-// @Param objectName query string true "要删除的对象名称" 
+// @Param objectName query string true "要删除的对象名称"
 // @Success 200 {object} map[string]string "删除成功" {message=string}
 // @Failure 400 {object} map[string]string "请求参数错误" {error=string}
 // @Failure 500 {object} map[string]string "内部服务器错误" {error=string}
@@ -86,10 +86,10 @@ func deleteObject(c *gin.Context) {
 func main() {
 	// 初始化任务队列
 	taskQueue := queue.NewInMemoryTaskQueue()
-	
+
 	// 初始化工作池
 	workerPool := service.NewWorkerPool(3, taskQueue)
-	
+
 	// 初始化监控API
 	monitorAPI := api.NewMonitorAPI(taskQueue, workerPool)
 
@@ -110,7 +110,7 @@ func main() {
 	// 提供静态文件服务
 	router.StaticFile("/", "./web/index.html")
 	router.Static("/static", "./web")
-	
+
 	// 添加Swagger路由
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
@@ -145,15 +145,15 @@ func main() {
 		v1.POST("/video/url", func(c *gin.Context) {
 			api.HandleVideoURL(c, taskQueue)
 		})
-		
+
 		// 智能上传接口 - 根据文件类型决定处理方式
 		v1.POST("/video/smart-upload", func(c *gin.Context) {
 			api.SmartUpload(c, ossManager)
 		})
 	}
 
-	// 启动HTTP服务器监听8084端口
-	if err := router.Run(":8084"); err != nil {
+	// 启动HTTP服务器监听8082端口
+	if err := router.Run(":8082"); err != nil {
 		fmt.Printf("Failed to start HTTP server: %v\n", err)
 	}
 }
@@ -190,20 +190,20 @@ type OSSConfig struct {
 // loadOSSConfig 从配置文件加载OSS配置
 func loadOSSConfig() *service.OSSConfig {
 	config := &service.OSSConfig{}
-	
+
 	// 检查配置文件是否存在
 	if _, err := os.Stat("config/oss_config.json"); os.IsNotExist(err) {
 		fmt.Println("OSS配置文件不存在，使用空配置")
 		return config
 	}
-	
+
 	// 读取配置文件
 	data, err := os.ReadFile("config/oss_config.json")
 	if err != nil {
 		fmt.Println("读取OSS配置文件失败:", err)
 		return config
 	}
-	
+
 	// 解析配置文件
 	var ossConfig OSSConfig
 	err = json.Unmarshal(data, &ossConfig)
@@ -211,7 +211,7 @@ func loadOSSConfig() *service.OSSConfig {
 		fmt.Println("解析OSS配置文件失败:", err)
 		return config
 	}
-	
+
 	// 转换为服务层配置结构体
 	config = &service.OSSConfig{
 		Endpoint:        ossConfig.Endpoint,
@@ -219,6 +219,6 @@ func loadOSSConfig() *service.OSSConfig {
 		AccessKeySecret: ossConfig.AccessKeySecret,
 		BucketName:      ossConfig.BucketName,
 	}
-	
+
 	return config
 }
