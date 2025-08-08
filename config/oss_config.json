@@ -2,5 +2,6 @@
   "endpoint": "oss-cn-hangzhou.aliyuncs.com",
   "access_key_id": "LTAI5tFufCghCDEMueTE88Ba",
   "access_key_secret": "hdmCBMQPybY6rpXQlTwwKnx6m38Sb2",
-  "bucket_name": "aima-hotvideogeneration-videolibrary"
+  "bucket_name": "aima-hotvideogeneration-videolibrary",
+  "ts_bucket_name": "aima-hotvideogeneration-mp4tots"
 }

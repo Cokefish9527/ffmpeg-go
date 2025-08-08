@@ -185,6 +185,7 @@ type OSSConfig struct {
 	AccessKeyID     string `json:"access_key_id"`
 	AccessKeySecret string `json:"access_key_secret"`
 	BucketName      string `json:"bucket_name"`
+	TsBucketName    string `json:"ts_bucket_name"`
 }
 
 // loadOSSConfig 从配置文件加载OSS配置
@@ -218,6 +219,7 @@ func loadOSSConfig() *service.OSSConfig {
 		AccessKeyID:     ossConfig.AccessKeyID,
 		AccessKeySecret: ossConfig.AccessKeySecret,
 		BucketName:      ossConfig.BucketName,
+		TsBucketName:    ossConfig.TsBucketName,
 	}
 
 	return config

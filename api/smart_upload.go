@@ -21,14 +21,18 @@ type SmartUploadRequest struct {
 
 // SmartUploadResponse 智能上传响应
 type SmartUploadResponse struct {
-	Message string `json:"message"`
-	URL     string `json:"url"`
+	Message     string `json:"message"`
+	URL         string `json:"url"`
+	TsURL       string `json:"ts_url,omitempty"`
+	IsVideo     bool   `json:"is_video"`
 }
 
 // SmartUpload godoc
 // @Summary 智能文件上传
-// @Description 接收文件流，判断是否是视频文件，如果不是视频文件，直接上传到OSS，
-// @Description 如果是视频文件，转换为TS格式后上传到OSS。文件会根据用户ID存放到专属目录中。
+// @Description 接收文件流，原始文件统一上传到bucket：aima-hotvideogeneration-videolibrary，
+// @Description 如果原始文件是视频文件，则额外进行一次转换成ts格式的操作，
+// @Description 软换完成后，将ts文件上传到bucket：aima-hotvideogeneration-mp4tots，
+// @Description 上传到对应bucket的目录规则都是一样的，存放在userId的目录下
 // @Tags video
 // @Accept mpfd
 // @Produce json
@@ -92,12 +96,37 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	// 打印调试信息
 	fmt.Printf("文件路径: %s, 是否为视频文件: %t\n", tempFilePath, isVideo)
 
+	// 重新打开文件以供上传到主bucket
+	originalFile, err := os.Open(tempFilePath)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "打开临时文件失败: " + err.Error(),
+		})
+		return
+	}
+	defer originalFile.Close()
+
+	// 创建multipart.FileHeader用于主bucket上传
+	originalHeader := &multipart.FileHeader{
+		Filename: header.Filename,
+		Size:     header.Size,
+	}
+
+	// 将原始文件上传到主bucket
+	originalURL, err := ossManager.UploadFileWithPath(originalFile, originalHeader, userID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "原始文件上传失败: " + err.Error(),
+		})
+		return
+	}
+
+	var tsURL string
 	// 根据文件类型进行处理
-	var url string
 	if isVideo {
-		// 如果是视频文件，转换为TS格式
+		// 如果是视频文件，转换为TS格式并上传到TS bucket
 		fmt.Println("检测到视频文件，开始转换为TS格式")
-		url, err = processVideoFile(tempFilePath, header.Filename, userID, ossManager)
+		tsURL, err = processVideoFileToTs(tempFilePath, header.Filename, userID, ossManager)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
 				"error": "处理视频文件失败: " + err.Error(),
@@ -105,34 +134,21 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 			return
 		}
 		fmt.Println("视频文件转换完成")
-	} else {
-		// 如果不是视频文件，直接上传
-		fmt.Println("检测到非视频文件，直接上传")
-		// 重新打开文件以供上传
-		tempFile, err := os.Open(tempFilePath)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "打开临时文件失败: " + err.Error(),
-			})
-			return
-		}
-		defer tempFile.Close()
-
-		// 直接上传到OSS，使用用户ID作为目录
-		url, err = ossManager.UploadFileWithPath(tempFile, header, userID)
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": "文件上传失败: " + err.Error(),
-			})
-			return
-		}
 	}
 
 	// 返回成功响应
-	c.JSON(http.StatusOK, SmartUploadResponse{
+	response := SmartUploadResponse{
 		Message: "文件上传成功",
-		URL:     url,
-	})
+		URL:     originalURL,
+		IsVideo: isVideo,
+	}
+	
+	// 如果是视频文件，返回TS文件的URL
+	if isVideo {
+		response.TsURL = tsURL
+	}
+	
+	c.JSON(http.StatusOK, response)
 }
 
 // isVideoFile 检查文件是否为视频文件
@@ -182,8 +198,8 @@ func isVideoFile(filePath string) (bool, error) {
 	return hasVideoStream, nil
 }
 
-// processVideoFile 处理视频文件，转换为TS格式并上传
-func processVideoFile(inputPath, originalFilename, userID string, ossManager *service.OSSManager) (string, error) {
+// processVideoFileToTs 处理视频文件，转换为TS格式并上传到TS bucket
+func processVideoFileToTs(inputPath, originalFilename, userID string, ossManager *service.OSSManager) (string, error) {
 	fmt.Printf("开始处理视频文件: %s\n", inputPath)
 	
 	// 生成输出文件路径（TS格式）使用UUID确保唯一性
@@ -231,13 +247,13 @@ func processVideoFile(inputPath, originalFilename, userID string, ossManager *se
 		Size:     fileInfo.Size(),
 	}
 
-	// 上传到OSS，使用用户ID作为目录
-	url, err := ossManager.UploadFileWithPath(convertedFile, newHeader, userID)
+	// 上传到TS OSS bucket，使用用户ID作为目录
+	url, err := ossManager.UploadFileToTsBucket(convertedFile, newHeader, userID)
 	if err != nil {
-		return "", fmt.Errorf("上传文件到OSS失败: %w", err)
+		return "", fmt.Errorf("上传TS文件到OSS失败: %w", err)
 	}
 	
-	fmt.Printf("文件上传成功，URL: %s\n", url)
+	fmt.Printf("TS文件上传成功，URL: %s\n", url)
 
 	return url, nil
 }
