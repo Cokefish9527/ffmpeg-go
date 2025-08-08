@@ -29,11 +29,16 @@ type OSSConfig struct {
 }
 
 // OSSObject OSS对象信息
+// @Description OSS中存储的对象信息
 type OSSObject struct {
-	Name         string    `json:"name"`
-	Size         int64     `json:"size"`
-	LastModified time.Time `json:"lastModified"`
-	URL          string    `json:"url"`
+	// 对象名称
+	Name string `json:"name" example:"example.mp4"`
+	// 对象大小(字节)
+	Size int64 `json:"size" example:"1024000"`
+	// 对象最后修改时间
+	LastModified time.Time `json:"lastModified" example:"2023-08-10T10:30:00Z"`
+	// 对象访问URL
+	URL string `json:"url" example:"https://bucket-name.oss-cn-hangzhou.aliyuncs.com/example.mp4"`
 }
 
 // NewOSSManager 创建一个新的OSS管理器实例

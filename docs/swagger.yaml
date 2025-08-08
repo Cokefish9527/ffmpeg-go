@@ -1,435 +1,931 @@
-swagger: "2.0"
-info:
-  description: "视频编辑服务API接口文档"
-  title: "视频编辑服务 API"
-  termsOfService: "http://swagger.io/terms/"
-  contact:
-    name: "API 支持"
-    url: "http://www.swagger.io/support"
-    email: "support@swagger.io"
-  license:
-    name: "Apache 2.0"
-    url: "http://www.apache.org/licenses/LICENSE-2.0.html"
-  version: "1.0"
-host: "localhost:8082"
-basePath: "/api/v1"
-schemes:
-  - "http"
-paths:
-  /video/edit:
-    post:
-      description: "提交视频编辑任务"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "视频处理"
-      summary: "提交视频编辑任务"
-      parameters:
-        - description: "视频编辑请求参数"
-          name: "request"
-          in: "body"
-          required: true
-          schema:
-            $ref: "#/definitions/api.VideoEditRequest"
-      responses:
-        "202":
-          description: "任务已接受处理"
-          schema:
-            $ref: "#/definitions/api.VideoEditResponse"
-        "400":
-          description: "请求格式错误"
-          schema:
-            type: "object"
-            properties:
-              error:
-                type: "string"
-                description: "错误信息"
-        "500":
-          description: "提交任务失败"
-          schema:
-            type: "object"
-            properties:
-              error:
-                type: "string"
-                description: "错误信息"
-  /video/edit/{taskId}:
-    get:
-      description: "获取视频编辑任务状态"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "视频处理"
-      summary: "获取任务状态"
-      parameters:
-        - type: "string"
-          description: "任务ID"
-          name: "taskId"
-          in: "path"
-          required: true
-      responses:
-        "200":
-          description: "任务状态"
-          schema:
-            $ref: "#/definitions/TaskStatusResponse"
-        "404":
-          description: "任务未找到"
-          schema:
-            type: "object"
-            properties:
-              error:
-                type: "string"
-                description: "错误信息"
-        "500":
-          description: "获取任务状态失败"
-          schema:
-            type: "object"
-            properties:
-              error:
-                type: "string"
-                description: "错误信息"
-    delete:
-      description: "取消视频编辑任务"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "视频处理"
-      summary: "取消任务"
-      parameters:
-        - type: "string"
-          description: "任务ID"
-          name: "taskId"
-          in: "path"
-          required: true
-      responses:
-        "200":
-          description: "任务取消成功"
-          schema:
-            type: "object"
-            properties:
-              message:
-                type: "string"
-                description: "返回消息"
-        "500":
-          description: "取消任务失败"
-          schema:
-            type: "object"
-            properties:
-              error:
-                type: "string"
-                description: "错误信息"
-  /video/url:
-    post:
-      description: "处理视频URL"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "视频处理"
-      summary: "处理视频URL"
-      parameters:
-        - description: "视频URL请求参数"
-          name: "request"
-          in: "body"
-          required: true
-          schema:
-            $ref: "#/definitions/VideoURLRequest"
-      responses:
-        "200":
-          description: "视频转换成功"
-          schema:
-            $ref: "#/definitions/VideoURLResponse"
-        "400":
-          description: "请求格式错误"
-          schema:
-            $ref: "#/definitions/VideoURLResponse"
-        "500":
-          description: "处理视频失败"
-          schema:
-            $ref: "#/definitions/VideoURLResponse"
-  /monitor/stats:
-    get:
-      description: "获取系统统计信息"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "监控"
-      summary: "获取系统统计"
-      responses:
-        "200":
-          description: "系统统计信息"
-          schema:
-            $ref: "#/definitions/api.SystemStats"
-  /monitor/tasks/stats:
-    get:
-      description: "获取任务统计信息"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "监控"
-      summary: "获取任务统计"
-      responses:
-        "200":
-          description: "任务统计信息"
-          schema:
-            $ref: "#/definitions/api.TaskStats"
-  /monitor/tasks:
-    get:
-      description: "获取任务列表"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "监控"
-      summary: "获取任务列表"
-      responses:
-        "200":
-          description: "任务列表"
-          schema:
-            type: "array"
-            items:
-              $ref: "#/definitions/queue.Task"
-  /monitor/tasks/{taskId}:
-    get:
-      description: "获取任务详情"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "监控"
-      summary: "获取任务详情"
-      parameters:
-        - type: "string"
-          description: "任务ID"
-          name: "taskId"
-          in: "path"
-          required: true
-      responses:
-        "200":
-          description: "任务详情"
-          schema:
-            $ref: "#/definitions/queue.Task"
-  /monitor/workers:
-    get:
-      description: "获取工作进程统计信息"
-      consumes:
-        - "application/json"
-      produces:
-        - "application/json"
-      tags:
-        - "监控"
-      summary: "获取工作进程统计"
-      responses:
-        "200":
-          description: "工作进程统计信息"
-          schema:
-            type: "object"
-            properties:
-              workerCount:
-                type: "integer"
-                description: "工作进程总数"
-              activeWorkers:
-                type: "integer"
-                description: "活跃工作进程数"
+basePath: /api/v1
 definitions:
   api.OSSOutput:
-    type: "object"
+    description: OSS输出配置参数
     properties:
       accessKey:
-        type: "string"
-        description: "OSS访问密钥"
+        description: AccessKey
+        type: string
       bucket:
-        type: "string"
-        description: "OSS存储桶名称"
+        description: Bucket
+        type: string
       endpoint:
-        type: "string"
-        description: "OSS终端节点"
+        description: Endpoint
+        type: string
       key:
-        type: "string"
-        description: "OSS对象键"
+        description: Key
+        type: string
       secretKey:
-        type: "string"
-        description: "OSS密钥"
+        description: SecretKey
+        type: string
+    type: object
   api.SystemStats:
-    type: "object"
+    description: 系统统计信息
     properties:
       activeWorkers:
-        type: "integer"
-        description: "活跃工作进程数"
+        description: 活跃工作线程数
+        type: integer
       cpuUsage:
-        type: "number"
-        description: "CPU使用率"
+        description: CPU使用率
+        type: number
       diskTotal:
-        type: "integer"
-        description: "磁盘总容量(字节)"
+        description: 总磁盘空间
+        type: integer
       diskUsage:
-        type: "number"
-        description: "磁盘使用率"
+        description: 磁盘使用率
+        type: number
       diskUsed:
-        type: "integer"
-        description: "已使用磁盘空间(字节)"
+        description: 已使用磁盘空间
+        type: integer
       goroutines:
-        type: "integer"
-        description: "Goroutines数量"
+        description: Goroutines数量
+        type: integer
       memoryTotal:
-        type: "integer"
-        description: "内存总容量(字节)"
+        description: 总内存
+        type: integer
       memoryUsage:
-        type: "number"
-        description: "内存使用率"
+        description: 内存使用率
+        type: number
       memoryUsed:
-        type: "integer"
-        description: "已使用内存(字节)"
+        description: 已使用内存
+        type: integer
       taskQueueSize:
-        type: "integer"
-        description: "任务队列大小"
+        description: 任务队列大小
+        type: integer
       timestamp:
-        type: "string"
-        description: "时间戳"
+        description: 时间戳
+        type: string
       workerCount:
-        type: "integer"
-        description: "工作进程总数"
+        description: 工作线程总数
+        type: integer
+    type: object
+  api.TaskCancelRequest:
+    description: 任务取消请求参数
+    properties:
+      taskId:
+        description: 任务ID
+        type: string
+    required:
+    - taskId
+    type: object
+  api.TaskDiscardRequest:
+    description: 任务丢弃请求参数
+    properties:
+      taskId:
+        description: 任务ID
+        type: string
+    required:
+    - taskId
+    type: object
+  api.TaskRetryRequest:
+    description: 任务重试请求参数
+    properties:
+      taskId:
+        description: 任务ID
+        type: string
+    required:
+    - taskId
+    type: object
   api.TaskStats:
-    type: "object"
+    description: 任务统计信息
     properties:
       completedTasks:
-        type: "integer"
-        description: "已完成任务数"
+        description: 已完成任务数
+        type: integer
       failedTasks:
-        type: "integer"
-        description: "失败任务数"
+        description: 失败任务数
+        type: integer
       pendingTasks:
-        type: "integer"
-        description: "待处理任务数"
+        description: 待处理任务数
+        type: integer
       processingTasks:
-        type: "integer"
-        description: "正在处理任务数"
+        description: 处理中任务数
+        type: integer
       totalTasks:
-        type: "integer"
-        description: "总任务数"
-  TaskStatusResponse:
-    type: "object"
+        description: 总任务数
+        type: integer
+    type: object
+  api.TaskStatusResponse:
+    description: 任务状态响应信息
     properties:
-      taskId:
-        type: "string"
-        description: "任务ID"
-      status:
-        type: "string"
-        description: "任务状态"
-      progress:
-        type: "number"
-        description: "任务进度(0-1)"
-      message:
-        type: "string"
-        description: "任务消息"
       created:
-        type: "string"
-        description: "任务创建时间"
-      started:
-        type: "string"
-        description: "任务开始时间"
+        description: 创建时间
+        type: string
       finished:
-        type: "string"
-        description: "任务完成时间"
-      outputUrl:
-        type: "string"
-        description: "输出文件URL"
-      priority:
-        type: "integer"
-        description: "任务优先级"
-  VideoURLRequest:
-    type: "object"
-    properties:
-      url:
-        type: "string"
-        description: "视频URL地址"
-  VideoURLResponse:
-    type: "object"
-    properties:
-      status:
-        type: "string"
-        description: "处理状态"
+        description: 完成时间
+        type: string
       message:
-        type: "string"
-        description: "返回消息"
-      tsFilePath:
-        type: "string"
-        description: "TS文件路径"
-      error:
-        type: "string"
-        description: "错误信息"
+        description: 消息
+        type: string
+      outputUrl:
+        description: 输出URL
+        type: string
+      priority:
+        description: 优先级
+        type: integer
+      progress:
+        description: 进度
+        type: number
+      started:
+        description: 开始时间
+        type: string
+      status:
+        description: 状态
+        type: string
+      taskId:
+        description: 任务ID
+        type: string
+    type: object
   api.VideoEditRequest:
-    type: "object"
+    description: 视频编辑请求参数
     properties:
       ossOutput:
-        $ref: "#/definitions/api.OSSOutput"
-        description: "OSS输出配置"
+        allOf:
+        - $ref: '#/definitions/api.OSSOutput'
+        description: OSS输出配置
       outputPath:
-        type: "string"
-        description: "输出路径"
+        description: 输出路径
+        type: string
       priority:
-        type: "integer"
-        description: "任务优先级"
+        description: 任务优先级
+        type: integer
       spec:
-        type: "object"
-        description: "任务规格"
+        description: 任务规格
+    type: object
   api.VideoEditResponse:
-    type: "object"
+    description: 视频编辑任务提交响应
     properties:
       message:
-        type: "string"
-        description: "返回消息"
+        description: 消息
+        type: string
       outputUrl:
-        type: "string"
-        description: "输出文件URL"
+        description: 输出URL
+        type: string
       status:
-        type: "string"
-        description: "任务状态"
+        description: 状态
+        type: string
       taskId:
-        type: "string"
-        description: "任务ID"
+        description: 任务ID
+        type: string
+    type: object
+  api.VideoURLRequest:
+    description: 视频URL请求参数
+    properties:
+      url:
+        description: 视频URL
+        type: string
+    type: object
+  api.VideoURLResponse:
+    description: 视频URL处理响应
+    properties:
+      error:
+        description: 错误信息
+        type: string
+      message:
+        description: 消息
+        type: string
+      status:
+        description: 状态
+        type: string
+      taskId:
+        description: 任务ID
+        type: string
+      tsFilePath:
+        description: TS文件路径
+        type: string
+    type: object
   queue.Task:
-    type: "object"
     properties:
       created:
-        type: "string"
-        description: "任务创建时间"
+        type: string
       error:
-        type: "string"
-        description: "错误信息"
+        type: string
+      executionCount:
+        description: 添加执行次数字段
+        type: integer
       finished:
-        type: "string"
-        description: "任务完成时间"
+        type: string
       id:
-        type: "string"
-        description: "任务ID"
+        type: string
+      lastExecution:
+        description: 添加最后执行时间字段
+        type: string
       priority:
-        type: "integer"
-        description: "任务优先级"
+        allOf:
+        - $ref: '#/definitions/queue.TaskPriority'
+        description: 添加优先级字段
       progress:
-        type: "number"
-        description: "任务进度(0-1)"
+        type: number
       result:
-        type: "string"
-        description: "任务结果"
-      spec:
-        type: "object"
-        description: "任务规格"
+        type: string
+      spec: {}
       started:
-        type: "string"
-        description: "任务开始时间"
+        type: string
       status:
-        type: "string"
-        description: "任务状态"
+        type: string
+    type: object
+  queue.TaskExecution:
+    properties:
+      created:
+        type: string
+      error:
+        type: string
+      executionNumber:
+        description: 执行序号
+        type: integer
+      executionTime:
+        description: 修改为int64类型，表示毫秒
+        type: integer
+      finished:
+        type: string
+      id:
+        type: string
+      priority:
+        $ref: '#/definitions/queue.TaskPriority'
+      progress:
+        type: number
+      result:
+        type: string
+      spec: {}
+      started:
+        type: string
+      status:
+        type: string
+      taskId:
+        type: string
+    type: object
+  queue.TaskPriority:
+    enum:
+    - 0
+    - 1
+    - 2
+    - 3
+    type: integer
+    x-enum-varnames:
+    - PriorityLow
+    - PriorityNormal
+    - PriorityHigh
+    - PriorityCritical
+  service.OSSObject:
+    description: OSS中存储的对象信息
+    properties:
+      lastModified:
+        description: 对象最后修改时间
+        example: "2023-08-10T10:30:00Z"
+        type: string
+      name:
+        description: 对象名称
+        example: example.mp4
+        type: string
+      size:
+        description: 对象大小(字节)
+        example: 1024000
+        type: integer
+      url:
+        description: 对象访问URL
+        example: https://bucket-name.oss-cn-hangzhou.aliyuncs.com/example.mp4
+        type: string
+    type: object
+host: localhost:8084
+info:
+  contact: {}
+  description: 基于FFmpeg的视频编辑服务API
+  title: ffmpeg-go API
+  version: "1.0"
+paths:
+  /monitor/executions:
+    get:
+      description: 获取指定任务的执行历史记录
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务执行历史
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取任务执行历史
+      tags:
+      - monitor
+  /monitor/stats:
+    get:
+      description: 获取系统资源使用情况统计信息，包括CPU、内存、磁盘等
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 系统统计信息
+          schema:
+            $ref: '#/definitions/api.SystemStats'
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取系统统计信息
+      tags:
+      - monitor
+  /monitor/tasks:
+    get:
+      description: 获取所有任务列表，支持按状态和优先级筛选
+      parameters:
+      - description: 任务状态筛选
+        in: query
+        name: status
+        type: string
+      - description: 任务优先级筛选
+        in: query
+        name: priority
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务列表
+          schema:
+            items:
+              $ref: '#/definitions/queue.Task'
+            type: array
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取任务列表
+      tags:
+      - monitor
+  /monitor/tasks/{taskId}:
+    get:
+      description: 根据任务ID获取任务详细信息
+      parameters:
+      - description: 任务ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务详情
+          schema:
+            $ref: '#/definitions/queue.Task'
+        "404":
+          description: 任务未找到
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取任务详情
+      tags:
+      - monitor
+  /monitor/tasks/{taskId}/executions:
+    get:
+      description: 获取指定任务的所有执行历史记录
+      parameters:
+      - description: 任务ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务执行历史记录列表
+          schema:
+            items:
+              $ref: '#/definitions/queue.TaskExecution'
+            type: array
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取任务执行历史
+      tags:
+      - monitor
+  /monitor/tasks/{taskId}/log:
+    get:
+      description: 获取指定任务的日志内容
+      parameters:
+      - description: 任务ID
+        in: path
+        name: taskId
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务日志内容
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 任务日志未找到
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取任务日志
+      tags:
+      - monitor
+  /monitor/tasks/cancel:
+    post:
+      consumes:
+      - application/json
+      description: 取消一个待处理或处理中的任务
+      parameters:
+      - description: 任务取消请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.TaskCancelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 取消成功
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 请求参数错误或任务状态不正确
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 任务未找到
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 取消任务
+      tags:
+      - monitor
+  /monitor/tasks/discard:
+    post:
+      consumes:
+      - application/json
+      description: 丢弃一个已完成或失败的任务
+      parameters:
+      - description: 任务丢弃请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.TaskDiscardRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 丢弃成功
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 请求参数错误或任务状态不正确
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 任务未找到
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 丢弃任务
+      tags:
+      - monitor
+  /monitor/tasks/retry:
+    post:
+      consumes:
+      - application/json
+      description: 重试一个失败的任务
+      parameters:
+      - description: 任务重试请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.TaskRetryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 重试成功
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 任务未找到
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 重试失败的任务
+      tags:
+      - monitor
+  /monitor/tasks/stats:
+    get:
+      description: 获取任务统计信息，包括各种状态的任务数量
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务统计信息
+          schema:
+            $ref: '#/definitions/api.TaskStats'
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取任务统计信息
+      tags:
+      - monitor
+  /monitor/workers:
+    get:
+      description: 获取Worker池的统计信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: Worker统计信息
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取Worker统计信息
+      tags:
+      - monitor
+  /oss/object:
+    delete:
+      description: 根据对象名称删除OSS中的对象。注意：删除操作不可逆，请谨慎操作。
+      parameters:
+      - description: 要删除的对象名称
+        in: query
+        name: objectName
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 删除成功" {message=string}
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 请求参数错误" {error=string}
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误" {error=string}
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 删除OSS中的对象
+      tags:
+      - oss
+  /oss/objects:
+    get:
+      description: 列出存储空间中的对象，支持按前缀过滤和限制返回数量。
+      parameters:
+      - default: '""'
+        description: 对象名称前缀，用于过滤对象列表
+        in: query
+        name: prefix
+        type: string
+      - default: 100
+        description: 最大返回对象数量
+        in: query
+        maximum: 1000
+        name: maxKeys
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 对象列表
+          schema:
+            items:
+              $ref: '#/definitions/service.OSSObject'
+            type: array
+        "500":
+          description: 内部服务器错误" {error=string}
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 列出OSS中的对象
+      tags:
+      - oss
+  /oss/upload:
+    post:
+      consumes:
+      - multipart/form-data
+      description: 上传文件到阿里云OSS并返回可访问的URL。该接口接收一个文件流，将其上传到配置的OSS存储桶中，并返回文件的公开访问URL。
+      parameters:
+      - description: 要上传的文件
+        format: binary
+        in: formData
+        name: file
+        required: true
+        type: file
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 文件上传成功" {message=string,url=string}
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 请求参数错误" {error=string}
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误" {error=string}
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 上传文件到OSS
+      tags:
+      - oss
+  /video/edit:
+    post:
+      consumes:
+      - application/json
+      description: 提交一个新的视频编辑任务
+      parameters:
+      - description: 视频编辑请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.VideoEditRequest'
+      produces:
+      - application/json
+      responses:
+        "202":
+          description: 任务提交成功
+          schema:
+            $ref: '#/definitions/api.VideoEditResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 提交视频编辑任务
+      tags:
+      - video
+  /video/edit/{id}:
+    delete:
+      description: 根据任务ID取消视频编辑任务
+      parameters:
+      - description: 任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务取消成功
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 任务未找到
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 取消视频编辑任务
+      tags:
+      - video
+    get:
+      description: 根据任务ID获取视频编辑任务的状态信息
+      parameters:
+      - description: 任务ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 任务状态信息
+          schema:
+            $ref: '#/definitions/api.TaskStatusResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: 任务未找到
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取视频编辑任务状态
+      tags:
+      - video
+  /video/url:
+    post:
+      consumes:
+      - application/json
+      description: 通过URL下载视频并提交处理任务
+      parameters:
+      - description: 视频URL请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/api.VideoURLRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 处理成功
+          schema:
+            $ref: '#/definitions/api.VideoURLResponse'
+        "400":
+          description: 请求参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 处理视频URL
+      tags:
+      - video
+  /workerpool/resize:
+    post:
+      consumes:
+      - application/json
+      description: 动态调整工作池中工作线程的数量
+      parameters:
+      - description: 工作池大小调整请求
+        in: body
+        name: request
+        required: true
+        schema:
+          additionalProperties:
+            type: integer
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 工作池调整成功
+          schema:
+            additionalProperties: true
+            type: object
+        "400":
+          description: 请求参数错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 调整工作池大小
+      tags:
+      - workerpool
+  /workerpool/status:
+    get:
+      description: 获取当前工作池的状态信息
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: 工作池状态信息
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: 内部服务器错误
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+      summary: 获取工作池状态
+      tags:
+      - workerpool
+securityDefinitions:
+  ApiKeyAuth:
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
+tags:
+- description: 视频编辑相关接口
+  name: video
+- description: 工作池管理接口
+  name: workerpool
+- description: 系统监控接口
+  name: monitor
+- description: 阿里云OSS存储接口
+  name: oss
