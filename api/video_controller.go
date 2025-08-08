@@ -2,13 +2,13 @@ package api
 
 import (
 	"fmt"
-	"io"
 	"net/http"
 	"os"
 	
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/u2takey/ffmpeg-go/queue"
+	"github.com/u2takey/ffmpeg-go/utils"
 )
 
 // SubmitVideoEdit 提交视频编辑任务
@@ -141,7 +141,7 @@ func HandleVideoURL(c *gin.Context, taskQueue queue.TaskQueue) {
 	filename := fmt.Sprintf("%s/%s_temp.mp4", tempDir, taskID)
 
 	// 下载文件
-	err := downloadFile(req.URL, filename)
+	err := utils.DownloadFile(req.URL, filename)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, VideoURLResponse{
 			Status:  "error",
@@ -178,35 +178,10 @@ func HandleVideoURL(c *gin.Context, taskQueue queue.TaskQueue) {
 		return
 	}
 
-	// 简单示例：处理视频URL
-	// 在实际应用中，这里会启动HTTP服务器来处理API请求
-	fmt.Println("Video processing service started")
-
 	c.JSON(http.StatusOK, VideoURLResponse{
 		Status:     "success",
 		Message:    "Video converted successfully",
 		TSFilePath: outputFile,
 		TaskID:     taskID,
 	})
-}
-
-// downloadFile 下载文件到指定路径
-func downloadFile(url, filepath string) error {
-	// 发起HTTP GET请求
-	resp, err := http.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-
-	// 创建目标文件
-	out, err := os.Create(filepath)
-	if err != nil {
-		return err
-	}
-	defer out.Close()
-
-	// 将HTTP响应内容写入文件
-	_, err = io.Copy(out, resp.Body)
-	return err
 }
