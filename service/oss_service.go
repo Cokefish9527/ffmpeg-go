@@ -69,8 +69,14 @@ func (o *OSSService) UploadFileWithPath(file multipart.File, header *multipart.F
         return "", fmt.Errorf("上传文件到OSS失败: %w", err)
     }
 
-    // 构造文件URL
-    url := fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, objectKey)
+    // 构造文件URL（带签名，确保可以直接访问）
+    // 签名有效期为1小时
+    url, err := o.bucket.SignURL(objectKey, oss.HTTPGet, 3600)
+    if err != nil {
+        // 如果签名失败，返回默认URL
+        return fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, objectKey), nil
+    }
+    
     return url, nil
 }
 
@@ -125,7 +131,13 @@ func (o *OSSService) DeleteObject(objectName string) error {
 	return nil
 }
 
-// GetObjectURL 获取对象的访问URL
+// GetObjectURL 获取对象的访问URL（带签名，确保可以直接访问）
 func (o *OSSService) GetObjectURL(objectName string) string {
-	return fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, objectName)
+    // 生成带签名的URL，有效期为1小时
+    url, err := o.bucket.SignURL(objectName, oss.HTTPGet, 3600)
+    if err != nil {
+        // 如果签名失败，返回默认URL
+        return fmt.Sprintf("https://%s.%s/%s", o.bucketName, o.client.Config.Endpoint, objectName)
+    }
+    return url
 }

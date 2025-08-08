@@ -95,7 +95,8 @@ func (o *OSSManager) UploadFileWithPath(file multipart.File, header *multipart.F
     
     // 在实际实现中，这里会使用阿里云OSS SDK上传文件
     // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    ossURL := fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, filepath.Join(path, fileName)) // 使用生成的UUID文件名
+    // 使用统一的URL格式，确保路径正确编码
+    ossURL := fmt.Sprintf("https://%s.%s/%s/%s", o.BucketName, o.Endpoint, path, fileName)
     
     // 模拟上传过程
     time.Sleep(100 * time.Millisecond)
@@ -170,5 +171,6 @@ func (o *OSSManager) GetObjectURL(objectName string) string {
 	}
 	
 	// 否则使用模拟实现
+	// 使用与UploadFileWithPath一致的URL格式
 	return fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, objectName)
 }
