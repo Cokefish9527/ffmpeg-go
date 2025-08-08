@@ -1,5 +1,8 @@
 # 使用官方Golang镜像作为构建阶段的基础镜像
-FROM golang:1.22-alpine AS builder
+FROM golang:1.23-alpine AS builder
+
+# 安装git，某些依赖可能需要
+RUN apk add --no-cache git
 
 # 设置构建参数
 ARG BUILDPLATFORM
@@ -12,8 +15,13 @@ WORKDIR /app
 # 复制go mod和sum文件
 COPY go.mod go.sum ./
 
-# 下载依赖
-RUN go mod download && go mod verify
+# 清理模块缓存并重新整理依赖
+RUN go clean -modcache && go mod tidy
+
+# 下载依赖，增加重试机制
+RUN go env -w GOPROXY=https://proxy.golang.org,direct && \
+    go mod download && \
+    go mod verify
 
 # 复制源代码
 COPY . .
