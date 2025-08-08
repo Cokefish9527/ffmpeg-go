@@ -26,6 +26,19 @@ type VideoEditResponse struct {
 	OutputURL string `json:"outputUrl,omitempty"`
 }
 
+// MaterialUploadResponse 素材上传响应
+// @Description 素材上传任务提交响应
+type MaterialUploadResponse struct {
+	// 任务ID
+	TaskID string `json:"taskId"`
+	// 状态
+	Status string `json:"status"`
+	// 消息
+	Message string `json:"message"`
+	// 输出URL
+	OutputURL string `json:"outputUrl,omitempty"`
+}
+
 // OSSOutput OSS输出配置
 // @Description OSS输出配置参数
 type OSSOutput struct {
@@ -69,6 +82,8 @@ type TaskStatusResponse struct {
 type VideoURLRequest struct {
 	// 视频URL
 	URL string `json:"url"`
+	// 回调URL
+	Callback string `json:"callback,omitempty"`
 }
 
 // VideoURLResponse 视频URL响应结构体

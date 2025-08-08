@@ -68,6 +68,8 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 
 			// 将任务添加到队列
 			if err := taskQueue.Push(task); err != nil {
+				// 清理已上传的文件
+				os.Remove(filename)
 				c.JSON(http.StatusInternalServerError, gin.H{
 					"error": "Failed to add task to queue",
 				})
@@ -104,6 +106,18 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 				os.Mkdir(tempDir, 0755)
 			}
 
+			// 创建任务对象
+			task := &queue.Task{
+				ID:     taskID,
+				Spec: map[string]interface{}{
+					"taskType": "materialPreprocess",
+					"callback": req.Callback, // 添加回调URL到任务规范中
+				},
+				Status:   "pending",
+				Created:  time.Now(),
+				Progress: 0.0,
+			}
+
 			// 保存文件到临时位置
 			filename := fmt.Sprintf("%s/%s_%s", tempDir, taskID, file.Filename)
 			if err := c.SaveUploadedFile(file, filename); err != nil {
@@ -113,17 +127,8 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 				return
 			}
 
-			// 创建任务对象
-			task := &queue.Task{
-				ID:     taskID,
-				Spec: map[string]interface{}{
-					"source":     filename,
-					"taskType":   "materialPreprocess",
-				},
-				Status:   "pending",
-				Created:  time.Now(),
-				Progress: 0.0,
-			}
+			// 更新任务规范中的source字段
+			task.Spec["source"] = filename
 
 			// 将任务添加到队列
 			if err := taskQueue.Push(task); err != nil {
@@ -138,6 +143,20 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 				TaskID:  taskID,
 				Status:  "accepted",
 				Message: "Material upload accepted for processing",
+			}
+
+			// 如果提供了回调URL，则发送回调
+			if req.Callback != "" {
+				go func() {
+					callbackData := map[string]interface{}{
+						"taskId":  taskID,
+						"status":  "accepted",
+						"message": "Material upload accepted for processing",
+					}
+					
+					callbackJSON, _ := json.Marshal(callbackData)
+					http.Post(req.Callback, "application/json", bytes.NewBuffer(callbackJSON))
+				}()
 			}
 
 			c.JSON(http.StatusAccepted, response)
@@ -192,7 +211,7 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 			
 			// 记录下载结束时间
 			downloadEnd := time.Now()
-			downloadDuration := downloadEnd.Sub(downloadStart).Seconds()
+			_ = downloadEnd.Sub(downloadStart).Seconds() // 忽略未使用的变量
 
 			// 生成输出文件路径 (TS格式)
 			ext := filepath.Ext(filename)
@@ -209,7 +228,6 @@ func setupTestServer() (*gin.Engine, *queue.InMemoryTaskQueue, *service.WorkerPo
 				},
 				Status:   "pending",
 				Created:  time.Now(),
-				Progress: 0.0,
 			}
 
 			// 将任务添加到队列
