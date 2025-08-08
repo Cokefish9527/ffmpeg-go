@@ -25,17 +25,23 @@ type MonitorAPI struct {
 }
 
 // TaskRetryRequest 任务重试请求
+// @Description 任务重试请求参数
 type TaskRetryRequest struct {
+	// 任务ID
 	TaskID string `json:"taskId" binding:"required"`
 }
 
 // TaskCancelRequest 任务取消请求
+// @Description 任务取消请求参数
 type TaskCancelRequest struct {
+	// 任务ID
 	TaskID string `json:"taskId" binding:"required"`
 }
 
 // TaskDiscardRequest 任务丢弃请求
+// @Description 任务丢弃请求参数
 type TaskDiscardRequest struct {
+	// 任务ID
 	TaskID string `json:"taskId" binding:"required"`
 }
 
@@ -48,31 +54,57 @@ func NewMonitorAPI(taskQueue queue.TaskQueue, workerPool *service.WorkerPool) *M
 }
 
 // SystemStats 系统统计信息
+// @Description 系统统计信息
 type SystemStats struct {
+	// 时间戳
 	Timestamp     time.Time `json:"timestamp"`
+	// CPU使用率
 	CPUUsage      float64   `json:"cpuUsage"`
+	// 内存使用率
 	MemoryUsage   float64   `json:"memoryUsage"`
+	// 总内存
 	MemoryTotal   uint64    `json:"memoryTotal"`
+	// 已使用内存
 	MemoryUsed    uint64    `json:"memoryUsed"`
+	// 磁盘使用率
 	DiskUsage     float64   `json:"diskUsage"`
+	// 总磁盘空间
 	DiskTotal     uint64    `json:"diskTotal"`
+	// 已使用磁盘空间
 	DiskUsed      uint64    `json:"diskUsed"`
+	// Goroutines数量
 	Goroutines    int       `json:"goroutines"`
+	// 工作线程总数
 	WorkerCount   int       `json:"workerCount"`
-	ActiveWorkers int       `json:"activeWorkers"` // 添加活跃Worker数量字段
+	// 活跃工作线程数
+	ActiveWorkers int       `json:"activeWorkers"`
+	// 任务队列大小
 	TaskQueueSize int       `json:"taskQueueSize"`
 }
 
 // TaskStats 任务统计信息
+// @Description 任务统计信息
 type TaskStats struct {
+	// 总任务数
 	TotalTasks     int `json:"totalTasks"`
+	// 待处理任务数
 	PendingTasks   int `json:"pendingTasks"`
+	// 处理中任务数
 	ProcessingTasks int `json:"processingTasks"`
+	// 已完成任务数
 	CompletedTasks int `json:"completedTasks"`
+	// 失败任务数
 	FailedTasks    int `json:"failedTasks"`
 }
 
 // GetSystemStats 获取系统统计信息
+// @Summary 获取系统统计信息
+// @Description 获取系统资源使用情况统计信息，包括CPU、内存、磁盘等
+// @Tags monitor
+// @Produce json
+// @Success 200 {object} SystemStats "系统统计信息"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/stats [get]
 func (m *MonitorAPI) GetSystemStats(c *gin.Context) {
 	utils.Debug("收到系统统计信息请求", map[string]string{"clientIP": c.ClientIP()})
 	
@@ -138,6 +170,13 @@ func (m *MonitorAPI) GetSystemStats(c *gin.Context) {
 }
 
 // GetTaskStats 获取任务统计信息
+// @Summary 获取任务统计信息
+// @Description 获取任务统计信息，包括各种状态的任务数量
+// @Tags monitor
+// @Produce json
+// @Success 200 {object} TaskStats "任务统计信息"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks/stats [get]
 func (m *MonitorAPI) GetTaskStats(c *gin.Context) {
 	utils.Debug("收到任务统计信息请求", map[string]string{"clientIP": c.ClientIP()})
 	
@@ -181,6 +220,15 @@ func (m *MonitorAPI) GetTaskStats(c *gin.Context) {
 }
 
 // GetTasks 获取任务列表
+// @Summary 获取任务列表
+// @Description 获取所有任务列表，支持按状态和优先级筛选
+// @Tags monitor
+// @Produce json
+// @Param status query string false "任务状态筛选"
+// @Param priority query string false "任务优先级筛选"
+// @Success 200 {array} queue.Task "任务列表"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks [get]
 func (m *MonitorAPI) GetTasks(c *gin.Context) {
 	utils.Debug("收到任务列表请求", map[string]string{"clientIP": c.ClientIP()})
 	
@@ -223,6 +271,15 @@ func (m *MonitorAPI) GetTasks(c *gin.Context) {
 }
 
 // GetTaskDetail 获取任务详情
+// @Summary 获取任务详情
+// @Description 根据任务ID获取任务详细信息
+// @Tags monitor
+// @Produce json
+// @Param taskId path string true "任务ID"
+// @Success 200 {object} queue.Task "任务详情"
+// @Failure 404 {object} map[string]string "任务未找到"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks/{taskId} [get]
 func (m *MonitorAPI) GetTaskDetail(c *gin.Context) {
 	taskID := c.Param("taskId")
 	utils.Debug("收到任务详情请求", map[string]string{
@@ -256,6 +313,13 @@ func (m *MonitorAPI) GetTaskDetail(c *gin.Context) {
 }
 
 // GetWorkerStats 获取Worker统计信息
+// @Summary 获取Worker统计信息
+// @Description 获取Worker池的统计信息
+// @Tags monitor
+// @Produce json
+// @Success 200 {object} map[string]interface{} "Worker统计信息"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/workers [get]
 func (m *MonitorAPI) GetWorkerStats(c *gin.Context) {
 	utils.Debug("收到Worker统计信息请求", map[string]string{"clientIP": c.ClientIP()})
 	
@@ -272,6 +336,17 @@ func (m *MonitorAPI) GetWorkerStats(c *gin.Context) {
 }
 
 // RetryTask 重试失败的任务
+// @Summary 重试失败的任务
+// @Description 重试一个失败的任务
+// @Tags monitor
+// @Accept json
+// @Produce json
+// @Param request body TaskRetryRequest true "任务重试请求"
+// @Success 200 {object} map[string]string "重试成功"
+// @Failure 400 {object} map[string]string "请求参数错误"
+// @Failure 404 {object} map[string]string "任务未找到"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks/retry [post]
 func (m *MonitorAPI) RetryTask(c *gin.Context) {
 	utils.Debug("收到任务重试请求", map[string]string{"clientIP": c.ClientIP()})
 	
@@ -370,6 +445,17 @@ func (m *MonitorAPI) RetryTask(c *gin.Context) {
 }
 
 // CancelTask 取消任务
+// @Summary 取消任务
+// @Description 取消一个待处理或处理中的任务
+// @Tags monitor
+// @Accept json
+// @Produce json
+// @Param request body TaskCancelRequest true "任务取消请求"
+// @Success 200 {object} map[string]string "取消成功"
+// @Failure 400 {object} map[string]string "请求参数错误或任务状态不正确"
+// @Failure 404 {object} map[string]string "任务未找到"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks/cancel [post]
 func (m *MonitorAPI) CancelTask(c *gin.Context) {
 	utils.Debug("收到任务取消请求", map[string]string{"clientIP": c.ClientIP()})
 	
@@ -440,6 +526,17 @@ func (m *MonitorAPI) CancelTask(c *gin.Context) {
 }
 
 // DiscardTask 丢弃任务
+// @Summary 丢弃任务
+// @Description 丢弃一个已完成或失败的任务
+// @Tags monitor
+// @Accept json
+// @Produce json
+// @Param request body TaskDiscardRequest true "任务丢弃请求"
+// @Success 200 {object} map[string]string "丢弃成功"
+// @Failure 400 {object} map[string]string "请求参数错误或任务状态不正确"
+// @Failure 404 {object} map[string]string "任务未找到"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks/discard [post]
 func (m *MonitorAPI) DiscardTask(c *gin.Context) {
 	utils.Debug("收到任务丢弃请求", map[string]string{"clientIP": c.ClientIP()})
 	
@@ -515,6 +612,14 @@ func (m *MonitorAPI) DiscardTask(c *gin.Context) {
 }
 
 // GetTaskExecutions 获取任务的所有执行历史
+// @Summary 获取任务执行历史
+// @Description 获取指定任务的所有执行历史记录
+// @Tags monitor
+// @Produce json
+// @Param taskId path string true "任务ID"
+// @Success 200 {array} queue.TaskExecution "任务执行历史记录列表"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks/{taskId}/executions [get]
 func (m *MonitorAPI) GetTaskExecutions(c *gin.Context) {
     taskId := c.Param("taskId")
     utils.Debug("收到任务执行历史请求", map[string]string{
@@ -540,6 +645,15 @@ func (m *MonitorAPI) GetTaskExecutions(c *gin.Context) {
 }
 
 // GetTaskLog 获取任务日志
+// @Summary 获取任务日志
+// @Description 获取指定任务的日志内容
+// @Tags monitor
+// @Produce json
+// @Param taskId path string true "任务ID"
+// @Success 200 {object} map[string]string "任务日志内容"
+// @Failure 404 {object} map[string]string "任务日志未找到"
+// @Failure 500 {object} map[string]string "内部服务器错误"
+// @Router /monitor/tasks/{taskId}/log [get]
 func (m *MonitorAPI) GetTaskLog(c *gin.Context) {
 	utils.Debug("收到任务日志请求", map[string]string{"clientIP": c.ClientIP()})
 

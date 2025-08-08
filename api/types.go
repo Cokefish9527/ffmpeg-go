@@ -1,97 +1,87 @@
 package api
 
-import (
-	"github.com/u2takey/ffmpeg-go/service"
-)
-
-// VideoEditRequest 视频编辑请求结构体
+// VideoEditRequest 视频编辑请求
+// @Description 视频编辑请求参数
 type VideoEditRequest struct {
-	// Spec 视频编辑规范，包含具体的编辑参数和配置
-	Spec       interface{}        `json:"spec"`
-	// OutputPath 本地输出路径，指定视频文件保存的本地路径
-	OutputPath string             `json:"outputPath,omitempty"` // 本地输出路径
-	// OSSOutput 阿里云OSS输出配置，用于将输出文件上传到OSS
-	OSSOutput  *OSSOutput         `json:"ossOutput,omitempty"`  // OSS 输出配置
-	// Priority 任务优先级
-	Priority   service.TaskPriority `json:"priority,omitempty"`   // 任务优先级
+	// 任务规格
+	Spec interface{} `json:"spec"`
+	// 输出路径
+	OutputPath string `json:"outputPath,omitempty"`
+	// OSS输出配置
+	OSSOutput *OSSOutput `json:"ossOutput,omitempty"`
+	// 任务优先级
+	Priority int `json:"priority,omitempty"`
 }
 
-// OSSOutput 阿里云OSS输出配置
-type OSSOutput struct {
-	// Bucket OSS存储桶名称
-	Bucket    string `json:"bucket"`
-	// Key OSS对象键名，即文件在OSS中的路径
-	Key       string `json:"key"`
-	// Endpoint OSS服务终端节点
-	Endpoint  string `json:"endpoint"`
-	// AccessKey 阿里云访问密钥ID
-	AccessKey string `json:"accessKey"`
-	// SecretKey 阿里云访问密钥Secret
-	SecretKey string `json:"secretKey"`
-}
-
-// VideoEditResponse 视频编辑响应结构体
+// VideoEditResponse 视频编辑响应
+// @Description 视频编辑任务提交响应
 type VideoEditResponse struct {
-	// TaskID 任务ID，用于标识和查询任务状态
-	TaskID    string `json:"taskId"`
-	// Status 任务状态，如"accepted"表示已接受
-	Status    string `json:"status"`
-	// Message 响应消息，提供额外的信息说明
-	Message   string `json:"message"`
-	// OutputURL 输出文件的URL地址（如果已上传到OSS）
+	// 任务ID
+	TaskID string `json:"taskId"`
+	// 状态
+	Status string `json:"status"`
+	// 消息
+	Message string `json:"message"`
+	// 输出URL
 	OutputURL string `json:"outputUrl,omitempty"`
 }
 
-// TaskStatusResponse 任务状态响应结构体
-type TaskStatusResponse struct {
-	// TaskID 任务ID
-	TaskID    string             `json:"taskId"`
-	// Status 任务当前状态，如"pending"、"processing"、"completed"、"failed"
-	Status    string             `json:"status"`
-	// Progress 任务进度百分比，范围0-1
-	Progress  float64            `json:"progress"`
-	// Message 任务相关的消息或错误信息
-	Message   string             `json:"message,omitempty"`
-	// Created 任务创建时间，RFC3339格式
-	Created   string             `json:"created,omitempty"`
-	// Started 任务开始处理时间，RFC3339格式
-	Started   string             `json:"started,omitempty"`
-	// Finished 任务完成时间，RFC3339格式
-	Finished  string             `json:"finished,omitempty"`
-	// OutputURL 输出文件的URL地址
-	OutputURL string             `json:"outputUrl,omitempty"`
-	// Priority 任务优先级
-	Priority  service.TaskPriority `json:"priority,omitempty"`   // 任务优先级
+// OSSOutput OSS输出配置
+// @Description OSS输出配置参数
+type OSSOutput struct {
+	// Endpoint
+	Endpoint string `json:"endpoint"`
+	// AccessKey
+	AccessKey string `json:"accessKey"`
+	// SecretKey
+	SecretKey string `json:"secretKey"`
+	// Bucket
+	Bucket string `json:"bucket"`
+	// Key
+	Key string `json:"key"`
 }
 
-// MaterialUploadResponse 素材上传响应结构体
-type MaterialUploadResponse struct {
-	// TaskID 任务ID，用于标识和查询转换任务状态
-	TaskID    string `json:"taskId"`
-	// Status 任务状态
-	Status    string `json:"status"`
-	// Message 响应消息
-	Message   string `json:"message"`
+// TaskStatusResponse 任务状态响应
+// @Description 任务状态响应信息
+type TaskStatusResponse struct {
+	// 任务ID
+	TaskID string `json:"taskId"`
+	// 状态
+	Status string `json:"status"`
+	// 进度
+	Progress float64 `json:"progress"`
+	// 消息
+	Message string `json:"message,omitempty"`
+	// 创建时间
+	Created string `json:"created,omitempty"`
+	// 开始时间
+	Started string `json:"started,omitempty"`
+	// 完成时间
+	Finished string `json:"finished,omitempty"`
+	// 输出URL
+	OutputURL string `json:"outputUrl,omitempty"`
+	// 优先级
+	Priority int `json:"priority,omitempty"`
 }
 
 // VideoURLRequest 视频URL请求结构体
+// @Description 视频URL请求参数
 type VideoURLRequest struct {
-	// URL 视频文件的URL地址
+	// 视频URL
 	URL string `json:"url"`
-	// Callback 转换完成后的回调URL，用于通知调用方提取转换后的TS文件
-	Callback string `json:"callback,omitempty"`
 }
 
 // VideoURLResponse 视频URL响应结构体
+// @Description 视频URL处理响应
 type VideoURLResponse struct {
-	// Status 处理状态
+	// 状态
 	Status string `json:"status"`
-	// Message 响应消息
+	// 消息
 	Message string `json:"message"`
-	// TSFilePath 转换后的TS文件本地路径
+	// TS文件路径
 	TSFilePath string `json:"tsFilePath,omitempty"`
-	// TaskID 任务ID，用于查询任务状态
-	TaskID string `json:"taskId,omitempty"`
-	// Error 错误信息（如果有）
+	// 错误信息
 	Error string `json:"error,omitempty"`
+	// 任务ID
+	TaskID string `json:"taskId,omitempty"`
 }
