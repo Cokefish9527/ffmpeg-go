@@ -18,7 +18,7 @@ COPY go.mod go.sum ./
 # 清理模块缓存并重新整理依赖
 RUN go clean -modcache && go mod tidy
 
-# 下载依赖，增加重试机制
+# 设置GOPROXY并下载依赖
 RUN go env -w GOPROXY=https://proxy.golang.org,direct && \
     go mod download && \
     go mod verify
