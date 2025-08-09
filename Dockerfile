@@ -1,16 +1,11 @@
 # 使用官方Golang镜像作为构建阶段的基础镜像
 FROM golang:1.23-alpine AS builder
 
-# 安装git，某些依赖可能需要
+# 安装git
 RUN apk add --no-cache git
 
-# 设置构建参数
-ARG BUILDPLATFORM
-ARG TARGETOS
-ARG TARGETARCH
-
 # 设置工作目录
-WORKDIR /go/src/github.com/u2takey/ffmpeg-go
+WORKDIR /app
 
 # 复制go mod和sum文件
 COPY go.mod go.sum ./
@@ -27,7 +22,7 @@ RUN go env -w GOPROXY=https://proxy.golang.org,direct && \
 COPY . .
 
 # 构建应用
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -a -installsuffix cgo -o /app/ffmpeg-go cmd/main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ffmpeg-go cmd/main.go
 
 # 使用轻量级Alpine镜像作为运行时基础镜像
 FROM alpine:latest
