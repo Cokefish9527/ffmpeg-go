@@ -820,7 +820,7 @@ const docTemplate = `{
         },
         "/video/smart-upload": {
             "post": {
-                "description": "接收文件流，判断是否是视频文件，如果不是视频文件，直接上传到OSS，\n如果是视频文件，转换为TS格式后上传到OSS。文件会根据用户ID存放到专属目录中。",
+                "description": "接收文件流，原始文件统一上传到bucket：aima-hotvideogeneration-videolibrary，\n如果原始文件是视频文件，则额外进行一次转换成ts格式的操作，\n软换完成后，将ts文件上传到bucket：aima-hotvideogeneration-mp4tots，\n上传到对应bucket的目录规则都是一样的，存放在userId的目录下",
                 "consumes": [
                     "multipart/form-data"
                 ],
@@ -1044,7 +1044,13 @@ const docTemplate = `{
         "api.SmartUploadResponse": {
             "type": "object",
             "properties": {
+                "is_video": {
+                    "type": "boolean"
+                },
                 "message": {
+                    "type": "string"
+                },
+                "ts_url": {
                     "type": "string"
                 },
                 "url": {
@@ -1264,6 +1270,10 @@ const docTemplate = `{
             "description": "视频URL请求参数",
             "type": "object",
             "properties": {
+                "callback": {
+                    "description": "回调URL",
+                    "type": "string"
+                },
                 "url": {
                     "description": "视频URL",
                     "type": "string"

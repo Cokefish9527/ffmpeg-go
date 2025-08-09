@@ -1,8 +1,13 @@
 # 使用官方Golang镜像作为构建阶段的基础镜像
 FROM golang:1.23-alpine AS builder
 
-# 安装git
+# 安装git，某些依赖可能需要
 RUN apk add --no-cache git
+
+# 设置构建参数
+ARG BUILDPLATFORM
+ARG TARGETOS
+ARG TARGETARCH
 
 # 设置工作目录
 WORKDIR /app
@@ -10,19 +15,18 @@ WORKDIR /app
 # 复制go mod和sum文件
 COPY go.mod go.sum ./
 
-# 清理模块缓存并重新整理依赖
-RUN go clean -modcache && go mod tidy
-
-# 设置GOPROXY并下载依赖
-RUN go env -w GOPROXY=https://proxy.golang.org,direct && \
-    go mod download && \
-    go mod verify
+# 下载依赖
+RUN go mod download && go mod verify
 
 # 复制源代码
 COPY . .
 
+# 重新生成Swagger文档
+RUN go install github.com/swaggo/swag/cmd/swag@latest && \
+    swag init -g cmd/main.go
+
 # 构建应用
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o ffmpeg-go cmd/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -a -installsuffix cgo -o ffmpeg-go cmd/main.go
 
 # 使用轻量级Alpine镜像作为运行时基础镜像
 FROM alpine:latest
