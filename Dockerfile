@@ -10,7 +10,7 @@ ARG TARGETOS
 ARG TARGETARCH
 
 # 设置工作目录
-WORKDIR /app
+WORKDIR /go/src/github.com/u2takey/ffmpeg-go
 
 # 复制go mod和sum文件
 COPY go.mod go.sum ./
@@ -27,7 +27,7 @@ RUN go env -w GOPROXY=https://proxy.golang.org,direct && \
 COPY . .
 
 # 构建应用
-RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -a -installsuffix cgo -o ffmpeg-go cmd/main.go
+RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH:-amd64} go build -a -installsuffix cgo -o /app/ffmpeg-go cmd/main.go
 
 # 使用轻量级Alpine镜像作为运行时基础镜像
 FROM alpine:latest

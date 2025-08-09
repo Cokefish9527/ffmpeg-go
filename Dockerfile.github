@@ -5,7 +5,7 @@ FROM golang:1.23-alpine AS builder
 RUN apk add --no-cache git
 
 # 设置工作目录
-WORKDIR /app
+WORKDIR /go/src/github.com/u2takey/ffmpeg-go
 
 # 复制go mod和sum文件
 COPY go.mod go.sum ./
