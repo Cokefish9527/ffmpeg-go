@@ -86,6 +86,9 @@ func deleteObject(c *gin.Context) {
 func main() {
 	// 初始化任务队列
 	taskQueue := queue.NewInMemoryTaskQueue()
+	
+	// 设置全局任务队列
+	api.SetTaskQueue(taskQueue)
 
 	// 初始化工作池
 	workerPool := service.NewWorkerPool(3, taskQueue)
@@ -108,8 +111,17 @@ func main() {
 	router := gin.Default()
 
 	// 提供静态文件服务
-	router.StaticFile("/", "./web/index.html")
-	router.Static("/static", "./web")
+	router.StaticFS("/static", http.Dir("./web"))
+	
+	// 设置首页路由
+	router.GET("/", func(c *gin.Context) {
+		c.File("./web/index.html")
+	})
+	
+	// 为了兼容可能的/index.html请求
+	router.GET("/index.html", func(c *gin.Context) {
+		c.File("./web/index.html")
+	})
 
 	// 添加Swagger路由
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -201,25 +213,14 @@ func loadOSSConfig() *service.OSSConfig {
 	// 读取配置文件
 	data, err := os.ReadFile("config/oss_config.json")
 	if err != nil {
-		fmt.Println("读取OSS配置文件失败:", err)
+		fmt.Printf("读取OSS配置文件失败: %v\n", err)
 		return config
 	}
 
-	// 解析配置文件
-	var ossConfig OSSConfig
-	err = json.Unmarshal(data, &ossConfig)
-	if err != nil {
-		fmt.Println("解析OSS配置文件失败:", err)
+	// 解析JSON配置
+	if err := json.Unmarshal(data, config); err != nil {
+		fmt.Printf("解析OSS配置文件失败: %v\n", err)
 		return config
-	}
-
-	// 转换为服务层配置结构体
-	config = &service.OSSConfig{
-		Endpoint:        ossConfig.Endpoint,
-		AccessKeyID:     ossConfig.AccessKeyID,
-		AccessKeySecret: ossConfig.AccessKeySecret,
-		BucketName:      ossConfig.BucketName,
-		TsBucketName:    ossConfig.TsBucketName,
 	}
 
 	return config

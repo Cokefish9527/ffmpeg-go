@@ -11,6 +11,8 @@ type VideoEditRequest struct {
 	OSSOutput *OSSOutput `json:"ossOutput,omitempty"`
 	// 任务优先级
 	Priority int `json:"priority,omitempty"`
+	// 是否启用详细日志
+	Verbose bool `json:"verbose,omitempty"`
 }
 
 // VideoEditResponse 视频编辑响应

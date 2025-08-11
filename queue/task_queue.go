@@ -49,6 +49,7 @@ type Task struct {
 	Priority      TaskPriority  `json:"priority"` // 添加优先级字段
 	ExecutionCount int          `json:"executionCount"` // 添加执行次数字段
 	LastExecution  time.Time    `json:"lastExecution"`  // 添加最后执行时间字段
+	Verbose       bool          `json:"verbose,omitempty"` // 是否启用详细日志
 }
 
 // TaskQueue 任务队列接口

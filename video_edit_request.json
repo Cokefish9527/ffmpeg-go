@@ -1,0 +1,58 @@
+{
+  "spec": [
+    {
+      "width": 1920,
+      "height": 1080,
+      "fps": 30,
+      "verbose": true,
+      "defaults": {
+        "duration": 3
+      },
+      "clips": [
+        {
+          "layers": [
+            {
+              "type": "video",
+              "path": "http://aima-hotvideogeneration-mp4tots.oss-cn-hangzhou.aliyuncs.com/2%2Fa40ea039-c471-4e2b-a9fb-d2065a547391.ts?Expires=1754685363&OSSAccessKeyId=LTAI5tFufCghCDEMueTE88Ba&Signature=k28%2FafMYXiF9InlvFaWyZjqxIj4%3D"
+            }
+          ]
+        },
+        {
+          "layers": [
+            {
+              "type": "video",
+              "path": "http://aima-hotvideogeneration-mp4tots.oss-cn-hangzhou.aliyuncs.com/2%2Fa40ea039-c471-4e2b-a9fb-d2065a547391.ts?Expires=1754685363&OSSAccessKeyId=LTAI5tFufCghCDEMueTE88Ba&Signature=k28%2FafMYXiF9InlvFaWyZjqxIj4%3D"
+            }
+          ]
+        },
+        {
+          "layers": [
+            {
+              "type": "video",
+              "path": "http://aima-hotvideogeneration-mp4tots.oss-cn-hangzhou.aliyuncs.com/2%2Fa40ea039-c471-4e2b-a9fb-d2065a547391.ts?Expires=1754685363&OSSAccessKeyId=LTAI5tFufCghCDEMueTE88Ba&Signature=k28%2FafMYXiF9InlvFaWyZjqxIj4%3D"
+            }
+          ]
+        },
+        {
+          "layers": [
+            {
+              "type": "video",
+              "path": "http://aima-hotvideogeneration-mp4tots.oss-cn-hangzhou.aliyuncs.com/2%2Fa40ea039-c471-4e2b-a9fb-d2065a547391.ts?Expires=1754685363&OSSAccessKeyId=LTAI5tFufCghCDEMueTE88Ba&Signature=k28%2FafMYXiF9InlvFaWyZjqxIj4%3D"
+            }
+          ]
+        },
+        {
+          "layers": [
+            {
+              "type": "video",
+              "path": "http://aima-hotvideogeneration-mp4tots.oss-cn-hangzhou.aliyuncs.com/2%2Fa40ea039-c471-4e2b-a9fb-d2065a547391.ts?Expires=1754685363&OSSAccessKeyId=LTAI5tFufCghCDEMueTE88Ba&Signature=k28%2FafMYXiF9InlvFaWyZjqxIj4%3D"
+            }
+          ]
+        }
+      ],
+      "keepSourceAudio": true
+    }
+  ],
+  "verbose": true,
+  "outputPath": "./output/test_video.mp4"
+}

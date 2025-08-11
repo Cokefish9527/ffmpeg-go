@@ -4,12 +4,22 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"time"
 	
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/u2takey/ffmpeg-go/queue"
+	"github.com/u2takey/ffmpeg-go/service"
 	"github.com/u2takey/ffmpeg-go/utils"
 )
+
+// 用于存储任务队列的全局变量
+var globalTaskQueue queue.TaskQueue
+
+// SetTaskQueue 设置全局任务队列
+func SetTaskQueue(taskQueue queue.TaskQueue) {
+	globalTaskQueue = taskQueue
+}
 
 // SubmitVideoEdit 提交视频编辑任务
 // @Summary 提交视频编辑任务
@@ -23,7 +33,62 @@ import (
 // @Failure 500 {object} map[string]string "内部服务器错误"
 // @Router /video/edit [post]
 func SubmitVideoEdit(c *gin.Context) {
-	// 实现提交视频编辑任务的逻辑
+	var req VideoEditRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Invalid request format",
+		})
+		return
+	}
+
+	// 生成任务ID
+	taskID := uuid.New().String()
+
+	// 创建任务对象
+	task := &queue.Task{
+		ID:       taskID,
+		Spec:     req.Spec,
+		Status:   "pending",
+		Progress: 0.0,
+		Verbose:  req.Verbose, // 设置详细日志开关
+		Created:  time.Now(),
+	}
+
+	// 将任务添加到队列
+	if globalTaskQueue == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Task queue not initialized",
+		})
+		return
+	}
+
+	if err := globalTaskQueue.Push(task); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to add task to queue",
+		})
+		return
+	}
+
+	// 创建任务日志记录器
+	taskLogger, err := service.NewTaskLogger(taskID)
+	if err != nil && req.Verbose {
+		fmt.Printf("Failed to create task logger: %v\n", err)
+	} else if taskLogger != nil {
+		taskLogger.Log("INFO", "任务已提交到队列", map[string]interface{}{
+			"taskId":  taskID,
+			"status":  "pending",
+			"verbose": req.Verbose,
+		})
+	}
+
+	// 返回成功响应
+	response := VideoEditResponse{
+		TaskID:  taskID,
+		Status:  "accepted",
+		Message: "Task accepted for processing",
+	}
+
+	c.JSON(http.StatusAccepted, response)
 }
 
 // GetVideoEditStatus 获取视频编辑任务状态
@@ -38,7 +103,45 @@ func SubmitVideoEdit(c *gin.Context) {
 // @Failure 500 {object} map[string]string "内部服务器错误"
 // @Router /video/edit/{id} [get]
 func GetVideoEditStatus(c *gin.Context) {
-	// 实现获取视频编辑任务状态的逻辑
+	taskID := c.Param("id")
+	if taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Task ID is required",
+		})
+		return
+	}
+
+	if globalTaskQueue == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Task queue not initialized",
+		})
+		return
+	}
+
+	task, err := globalTaskQueue.Get(taskID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get task",
+		})
+		return
+	}
+
+	if task == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Task not found",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"taskId":   task.ID,
+		"status":   task.Status,
+		"progress": task.Progress,
+		"error":    task.Error,
+		"created":  task.Created,
+		"started":  task.Started,
+		"finished": task.Finished,
+	})
 }
 
 // CancelVideoEdit 取消视频编辑任务
@@ -54,6 +157,57 @@ func GetVideoEditStatus(c *gin.Context) {
 // @Router /video/edit/{id} [delete]
 func CancelVideoEdit(c *gin.Context) {
 	// 实现取消视频编辑任务的逻辑
+	taskID := c.Param("id")
+	if taskID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": "Task ID is required",
+		})
+		return
+	}
+
+	if globalTaskQueue == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Task queue not initialized",
+		})
+		return
+	}
+
+	task, err := globalTaskQueue.Get(taskID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "Failed to get task",
+		})
+		return
+	}
+
+	if task == nil {
+		c.JSON(http.StatusNotFound, gin.H{
+			"error": "Task not found",
+		})
+		return
+	}
+
+	// 只能取消待处理和处理中的任务
+	if task.Status == "pending" || task.Status == "processing" {
+		task.Status = "cancelled"
+		task.Finished = time.Now()
+		err = globalTaskQueue.Update(task)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "Failed to update task",
+			})
+			return
+		}
+		
+		c.JSON(http.StatusOK, gin.H{
+			"message": "Task cancelled successfully",
+		})
+		return
+	}
+
+	c.JSON(http.StatusBadRequest, gin.H{
+		"error": "Task cannot be cancelled in current status",
+	})
 }
 
 // GetWorkerPoolStatus 获取工作池状态
@@ -66,6 +220,9 @@ func CancelVideoEdit(c *gin.Context) {
 // @Router /workerpool/status [get]
 func GetWorkerPoolStatus(c *gin.Context) {
 	// 实现获取工作池状态的逻辑
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Not implemented",
+	})
 }
 
 // ResizeWorkerPool 调整工作池大小
@@ -81,6 +238,9 @@ func GetWorkerPoolStatus(c *gin.Context) {
 // @Router /workerpool/resize [post]
 func ResizeWorkerPool(c *gin.Context) {
 	// 实现调整工作池大小的逻辑
+	c.JSON(http.StatusOK, gin.H{
+		"message": "Not implemented",
+	})
 }
 
 // GetTaskExecutions 获取任务执行历史

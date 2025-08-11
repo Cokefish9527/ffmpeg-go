@@ -10,6 +10,7 @@ import (
 type VideoEditRequest struct {
 	Spec     interface{}  `json:"spec"`
 	Priority queue.TaskPriority `json:"priority,omitempty"` // 添加优先级字段
+	Verbose  bool `json:"verbose,omitempty"` // 是否启用详细日志
 }
 
 // VideoEditor 视频编辑服务接口
@@ -40,6 +41,7 @@ func (s *VideoEditorService) SubmitTask(req *VideoEditRequest) (*queue.Task, err
 		Status:    "pending",
 		Created:   time.Now(),
 		Priority:  req.Priority, // 设置任务优先级
+		Verbose:   req.Verbose,  // 设置详细日志开关
 	}
 	
 	// 添加任务到队列
@@ -60,6 +62,7 @@ func (s *VideoEditorService) SubmitTask(req *VideoEditRequest) (*queue.Task, err
 		"taskId":   taskReq.ID,
 		"priority": taskReq.Priority,
 		"status":   taskReq.Status,
+		"verbose":  taskReq.Verbose,
 	})
 	
 	return taskReq, nil
