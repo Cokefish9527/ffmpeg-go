@@ -8,6 +8,7 @@ import (
 	
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/u2takey/ffmpeg-go"
 	"github.com/u2takey/ffmpeg-go/queue"
 	"github.com/u2takey/ffmpeg-go/service"
 	"github.com/u2takey/ffmpeg-go/utils"
@@ -28,7 +29,7 @@ func SetTaskQueue(taskQueue queue.TaskQueue) {
 // @Accept json
 // @Produce json
 // @Param request body VideoEditRequest true "视频编辑请求"
-// @Success 202 {object} VideoEditResponse "任务提交成功"
+// @Success 200 {object} VideoEditResponse "任务处理完成"
 // @Failure 400 {object} map[string]string "请求参数错误"
 // @Failure 500 {object} map[string]string "内部服务器错误"
 // @Router /video/edit [post]
@@ -48,47 +49,152 @@ func SubmitVideoEdit(c *gin.Context) {
 	task := &queue.Task{
 		ID:       taskID,
 		Spec:     req.Spec,
-		Status:   "pending",
+		Status:   "processing",
 		Progress: 0.0,
 		Verbose:  req.Verbose, // 设置详细日志开关
 		Created:  time.Now(),
+		Started:  time.Now(),
 	}
 
-	// 将任务添加到队列
-	if globalTaskQueue == nil {
+	// 直接处理任务而不是添加到队列
+	err := processVideoEditTask(task)
+	if err != nil {
+		task.Status = "failed"
+		task.Error = err.Error()
 		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Task queue not initialized",
+			"taskId": task.ID,
+			"status": task.Status,
+			"error":  task.Error,
 		})
 		return
 	}
 
-	if err := globalTaskQueue.Push(task); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"error": "Failed to add task to queue",
-		})
-		return
-	}
-
-	// 创建任务日志记录器
-	taskLogger, err := service.NewTaskLogger(taskID)
-	if err != nil && req.Verbose {
-		fmt.Printf("Failed to create task logger: %v\n", err)
-	} else if taskLogger != nil {
-		taskLogger.Log("INFO", "任务已提交到队列", map[string]interface{}{
-			"taskId":  taskID,
-			"status":  "pending",
-			"verbose": req.Verbose,
-		})
-	}
+	task.Status = "completed"
+	task.Progress = 1.0
+	task.Finished = time.Now()
 
 	// 返回成功响应
 	response := VideoEditResponse{
 		TaskID:  taskID,
-		Status:  "accepted",
-		Message: "Task accepted for processing",
+		Status:  task.Status,
+		Message: "Video edit task completed successfully",
 	}
 
-	c.JSON(http.StatusAccepted, response)
+	c.JSON(http.StatusOK, response)
+}
+
+// processVideoEditTask 处理视频编辑任务
+func processVideoEditTask(task *queue.Task) error {
+	// 创建任务日志记录器
+	taskLogger, err := service.NewTaskLogger(task.ID)
+	if err != nil && task.Verbose {
+		fmt.Printf("Failed to create task logger: %v\n", err)
+	} else if taskLogger != nil {
+		taskLogger.Log("INFO", "开始处理视频编辑任务", map[string]interface{}{
+			"taskId":  task.ID,
+			"status":  task.Status,
+			"verbose": task.Verbose,
+		})
+	}
+
+	// 将任务规范转换为EditSpec
+	spec, ok := task.Spec.(map[string]interface{})
+	if !ok {
+		return fmt.Errorf("invalid task spec format")
+	}
+
+	// 创建EditSpec对象
+	editSpec := &ffmpeg_go.EditSpec{}
+
+	// 从map转换到EditSpec结构体
+	if outPath, ok := spec["outPath"].(string); ok {
+		editSpec.OutPath = outPath
+	} else {
+		// 如果没有指定输出路径，使用默认路径
+		editSpec.OutPath = fmt.Sprintf("./output/%s.mp4", task.ID)
+	}
+
+	if width, ok := spec["width"].(float64); ok {
+		editSpec.Width = int(width)
+	} else {
+		editSpec.Width = 1920 // 默认宽度
+	}
+
+	if height, ok := spec["height"].(float64); ok {
+		editSpec.Height = int(height)
+	} else {
+		editSpec.Height = 1080 // 默认高度
+	}
+
+	if fps, ok := spec["fps"].(float64); ok {
+		editSpec.Fps = int(fps)
+	} else {
+		editSpec.Fps = 30 // 默认帧率
+	}
+
+	if verbose, ok := spec["verbose"].(bool); ok {
+		editSpec.Verbose = verbose
+	} else {
+		editSpec.Verbose = task.Verbose // 使用任务级别的verbose设置
+	}
+
+	// 处理clips
+	if clips, ok := spec["clips"].([]interface{}); ok {
+		editSpec.Clips = make([]*ffmpeg_go.Clip, len(clips))
+		for i, clip := range clips {
+			if clipMap, ok := clip.(map[string]interface{}); ok {
+				editSpec.Clips[i] = &ffmpeg_go.Clip{}
+
+				// 处理layers
+				if layers, ok := clipMap["layers"].([]interface{}); ok {
+					editSpec.Clips[i].Layers = make([]*ffmpeg_go.Layer, len(layers))
+					for j, layer := range layers {
+						if layerMap, ok := layer.(map[string]interface{}); ok {
+							editSpec.Clips[i].Layers[j] = &ffmpeg_go.Layer{}
+
+							if layerType, ok := layerMap["type"].(string); ok {
+								editSpec.Clips[i].Layers[j].Type = layerType
+							}
+
+							if path, ok := layerMap["path"].(string); ok {
+								editSpec.Clips[i].Layers[j].Path = path
+							}
+
+							if text, ok := layerMap["text"].(string); ok {
+								editSpec.Clips[i].Layers[j].Text = text
+							}
+						}
+					}
+				}
+			}
+		}
+	} else {
+		return fmt.Errorf("clips字段缺失或格式不正确")
+	}
+
+	// 创建Editly实例并执行编辑
+	editly := ffmpeg_go.NewEditly(editSpec)
+
+	err = editly.Edit()
+	if err != nil {
+		if taskLogger != nil && editSpec.Verbose {
+			taskLogger.Log("ERROR", "视频编辑任务失败", map[string]interface{}{
+				"taskId": task.ID,
+				"error":  err.Error(),
+			})
+		}
+		return err
+	}
+
+	if taskLogger != nil && editSpec.Verbose {
+		taskLogger.Log("INFO", "视频编辑任务完成", map[string]interface{}{
+			"taskId":  task.ID,
+			"outPath": editSpec.OutPath,
+		})
+	}
+
+	task.Progress = 1.0
+	return nil
 }
 
 // GetVideoEditStatus 获取视频编辑任务状态

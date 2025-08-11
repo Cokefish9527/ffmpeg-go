@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"io"
 	"mime/multipart"
+	"net/url"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,8 +20,10 @@ type OSSManager struct {
 	AccessKeySecret string
 	BucketName      string
 	TsBucketName    string
+	VideoOutputBucketName string // 视频编辑输出bucket
 	ossService      *OSSService
 	tsOssService    *OSSService
+	videoOutputOssService *OSSService
 }
 
 // OSSConfig OSS配置信息
@@ -29,6 +33,7 @@ type OSSConfig struct {
 	AccessKeySecret string `json:"accessKeySecret"`
 	BucketName      string `json:"bucketName"`
 	TsBucketName    string `json:"tsBucketName"`
+	VideoOutputBucketName string `json:"videoOutputBucketName"` // 视频编辑输出bucket
 }
 
 // OSSObject OSS对象信息
@@ -52,6 +57,7 @@ func NewOSSManager(config OSSConfig) *OSSManager {
 		AccessKeySecret: config.AccessKeySecret,
 		BucketName:      config.BucketName,
 		TsBucketName:    config.TsBucketName,
+		VideoOutputBucketName: config.VideoOutputBucketName,
 	}
 	
 	// 尝试初始化真实OSS服务
@@ -65,6 +71,14 @@ func NewOSSManager(config OSSConfig) *OSSManager {
 		tsOssService, err := NewOSSService(config.Endpoint, config.AccessKeyID, config.AccessKeySecret, config.TsBucketName)
 		if err == nil && tsOssService != nil {
 			ossManager.tsOssService = tsOssService
+		}
+	}
+	
+	// 如果视频输出bucket名称不为空，初始化视频输出OSS服务
+	if config.VideoOutputBucketName != "" {
+		videoOutputOssService, err := NewOSSService(config.Endpoint, config.AccessKeyID, config.AccessKeySecret, config.VideoOutputBucketName)
+		if err == nil && videoOutputOssService != nil {
+			ossManager.videoOutputOssService = videoOutputOssService
 		}
 	}
 	
@@ -147,6 +161,63 @@ func (o *OSSManager) UploadFileToTsBucket(file multipart.File, header *multipart
     time.Sleep(100 * time.Millisecond)
     
     return ossURL, nil
+}
+
+// UploadVideoOutput 上传视频编辑结果到输出bucket
+func (o *OSSManager) UploadVideoOutput(file multipart.File, header *multipart.FileHeader, path string) (string, error) {
+    // 如果有真实的视频输出OSS服务，则使用真实服务
+    if o.videoOutputOssService != nil {
+        return o.videoOutputOssService.UploadFileWithPath(file, header, path)
+    }
+    
+    // 否则使用模拟实现
+    // 生成唯一文件名
+    fileExt := filepath.Ext(header.Filename)
+    fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
+    
+    // 创建临时文件
+    tempDir := os.TempDir()
+    tempFilePath := filepath.Join(tempDir, fileName)
+    
+    tempFile, err := os.Create(tempFilePath)
+    if err != nil {
+        return "", fmt.Errorf("创建临时文件失败: %w", err)
+    }
+    defer tempFile.Close()
+    defer os.Remove(tempFilePath) // 清理临时文件
+    
+    // 将上传的文件内容复制到临时文件
+    _, err = io.Copy(tempFile, file)
+    if err != nil {
+        return "", fmt.Errorf("保存临时文件失败: %w", err)
+    }
+    
+    // 在实际实现中，这里会使用阿里云OSS SDK上传文件
+    // 由于需要配置真实的访问凭证，暂时返回模拟的URL
+    ossURL := fmt.Sprintf("https://%s.%s/%s", o.VideoOutputBucketName, o.Endpoint, filepath.Join(path, fileName))
+    
+    // 模拟上传过程
+    time.Sleep(100 * time.Millisecond)
+    
+    return ossURL, nil
+}
+
+// ExtractUserIDFromURL 从URL中提取用户ID
+func (o *OSSManager) ExtractUserIDFromURL(fileURL string) (string, error) {
+	parsedURL, err := url.Parse(fileURL)
+	if err != nil {
+		return "", fmt.Errorf("解析URL失败: %w", err)
+	}
+	
+	// 路径格式一般为 /userid/filename
+	path := parsedURL.Path
+	parts := strings.Split(strings.Trim(path, "/"), "/")
+	
+	if len(parts) >= 1 {
+		return parts[0], nil
+	}
+	
+	return "", fmt.Errorf("无法从URL中提取用户ID: %s", fileURL)
 }
 
 // UploadFileWithPath 上传文件到OSS指定路径

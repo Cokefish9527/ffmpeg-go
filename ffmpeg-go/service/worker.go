@@ -3,8 +3,10 @@ package service
 import (
 	"fmt"
 	"log"
+	"mime/multipart"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -244,6 +246,17 @@ func (w *WorkerImpl) processVideoEditTask(task *queue.Task) error {
 		return err
 	}
 	
+	// 上传结果文件到OSS
+	if err := w.uploadResultToOSS(task, editSpec.OutPath); err != nil {
+		if taskLogger != nil && editSpec.Verbose {
+			taskLogger.Log("ERROR", "上传视频结果到OSS失败", map[string]interface{}{
+				"taskId": task.ID,
+				"error":  err.Error(),
+			})
+		}
+		return err
+	}
+	
 	if taskLogger != nil && editSpec.Verbose {
 		taskLogger.Log("INFO", "视频编辑任务完成", map[string]interface{}{
 			"taskId":  task.ID,
@@ -252,6 +265,14 @@ func (w *WorkerImpl) processVideoEditTask(task *queue.Task) error {
 	}
 	
 	task.Progress = 1.0
+	return nil
+}
+
+// uploadResultToOSS 上传视频编辑结果到OSS
+func (w *WorkerImpl) uploadResultToOSS(task *queue.Task, outputPath string) error {
+	// TODO: 实现将视频编辑结果上传到OSS的逻辑
+	// 需要上传到 aima-hotvideogeneration-videooutput 这个bucket
+	// 并且需要根据视频素材URL中的userid确定上传目录
 	return nil
 }
 
@@ -335,16 +356,19 @@ func (e *Editly) validateInputs() error {
 		log.Println("验证输入文件...")
 	}
 
+	// 在视频编辑任务中提取用户ID
 	for i, clip := range e.spec.Clips {
 		for j, layer := range clip.Layers {
 			if layer.Type == "video" && layer.Path != "" {
 				if e.spec.Verbose {
 					log.Printf("验证片段 %d, 层 %d: %s", i+1, j+1, layer.Path)
 				}
+				
+				// 从URL中提取用户ID的逻辑可以在这里实现
+				// 但这部分逻辑应该在上传OSS时处理
 			}
 		}
 	}
 
 	return nil
 }
-

@@ -112,7 +112,7 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 		Size:     header.Size,
 	}
 
-	// 将原始文件上传到主bucket
+	// 将原始文件上传到主bucket的用户目录下
 	originalURL, err := ossManager.UploadFileWithPath(originalFile, originalHeader, userID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -124,7 +124,7 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	var tsURL string
 	// 根据文件类型进行处理
 	if isVideo {
-		// 如果是视频文件，转换为TS格式并上传到TS bucket
+		// 如果是视频文件，转换为TS格式并上传到TS bucket的用户目录下
 		fmt.Println("检测到视频文件，开始转换为TS格式")
 		tsURL, err = processVideoFileToTs(tempFilePath, header.Filename, userID, ossManager)
 		if err != nil {
@@ -136,7 +136,7 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 		fmt.Println("视频文件转换完成")
 	}
 
-	// 返回成功响应
+	// 返回成功响应，包含两个文件的可签名URL
 	response := SmartUploadResponse{
 		Message: "文件上传成功",
 		URL:     originalURL,
