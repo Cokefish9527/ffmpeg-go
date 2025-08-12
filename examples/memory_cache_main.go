@@ -1,4 +1,4 @@
-package main
+package example
 
 import (
 	"fmt"
@@ -9,7 +9,7 @@ import (
 	"github.com/u2takey/ffmpeg-go/service"
 )
 
-func main() {
+func Main() {
 	fmt.Println("开始测试内存和缓存优化功能...")
 
 	// 测试缓冲池

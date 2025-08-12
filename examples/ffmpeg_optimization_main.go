@@ -1,23 +1,58 @@
-package main
+package example
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
 	"time"
+
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
 func main() {
-	fmt.Println("开始测试FFmpeg参数调优效果...")
+	fmt.Println("=== FFmpeg性能优化测试 ===")
 	
-	// 测试不同编码器
-	testEncoders()
+	// 测试文件路径
+	inputFile := "./sample_data/in1.mp4"
+	outputFile1 := "./sample_data/optimized_output1.mp4"
+	outputFile2 := "./sample_data/optimized_output2.mp4"
 	
-	// 测试不同预设
-	testPresets()
+	// 测试1: 基础转换
+	fmt.Println("\n1. 基础转换:")
+	start := time.Now()
+	err := ffmpeg.Input(inputFile).
+		Output(outputFile1).
+		OverWriteOutput().
+		Run()
+	duration1 := time.Since(start)
 	
-	// 测试硬件编码器检测
-	testHardwareEncoderDetection()
+	if err != nil {
+		fmt.Printf("   错误: %v\n", err)
+	} else {
+		fmt.Printf("   耗时: %v\n", duration1)
+	}
+	
+	// 测试2: 优化参数转换
+	fmt.Println("\n2. 优化参数转换:")
+	start = time.Now()
+	err = ffmpeg.Input(inputFile).
+		Output(outputFile2, ffmpeg.KwArgs{
+			"vcodec": "libx264",
+			"preset": "fast",
+			"crf":    23,
+			"acodec": "aac",
+			"threads": 4,
+		}).
+		OverWriteOutput().
+		Run()
+	duration2 := time.Since(start)
+	
+	if err != nil {
+		fmt.Printf("   错误: %v\n", err)
+	} else {
+		fmt.Printf("   耗时: %v\n", duration2)
+		fmt.Printf("   性能提升: %v\n", duration1-duration2)
+	}
+	
+	fmt.Println("\n=== 性能优化测试完成 ===")
 }
 
 func testEncoders() {

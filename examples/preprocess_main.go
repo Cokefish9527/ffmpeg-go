@@ -1,105 +1,78 @@
-package main
+package example
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/u2takey/ffmpeg-go/service"
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
+// 预处理视频：调整分辨率和帧率
+func preprocessVideo(inputFile, outputFile string) error {
+	fmt.Printf("预处理视频: %s -> %s\n", inputFile, outputFile)
+	
+	start := time.Now()
+	err := ffmpeg.Input(inputFile).
+		Output(outputFile, ffmpeg.KwArgs{
+			"vf":       "scale=1280:720", // 调整分辨率到720p
+			"r":        30,               // 设置帧率为30fps
+			"vcodec":   "libx264",
+			"preset":   "fast",
+			"crf":      23,
+			"acodec":   "aac",
+			"ar":       44100,            // 音频采样率
+			"ac":       2,                // 双声道
+		}).
+		OverWriteOutput().
+		Run()
+	
+	duration := time.Since(start)
+	
+	if err != nil {
+		return fmt.Errorf("预处理失败: %w", err)
+	}
+	
+	fmt.Printf("预处理完成，耗时: %v\n", duration)
+	return nil
+}
+
+// 视频分析函数
+func analyzeVideo(inputFile string) error {
+	fmt.Printf("分析视频: %s\n", inputFile)
+	
+	// 获取视频信息
+	probeData, err := ffmpeg.Probe(inputFile)
+	if err != nil {
+		return fmt.Errorf("视频分析失败: %w", err)
+	}
+	
+	fmt.Printf("视频信息: %.100s...\n", probeData)
+	return nil
+}
+
 func main() {
-	// 创建视频信息缓存
-	cache := service.NewVideoInfoCache()
+	fmt.Println("=== 视频预处理测试 ===")
 	
-	// 获取当前工作目录
-	wd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("无法获取当前工作目录: %v\n", err)
-		return
+	inputFile := "./sample_data/in1.mp4"
+	preprocessedFile := "./sample_data/preprocessed_output.mp4"
+	
+	// 分析原始视频
+	fmt.Println("\n1. 分析原始视频:")
+	if err := analyzeVideo(inputFile); err != nil {
+		fmt.Printf("   错误: %v\n", err)
 	}
 	
-	// 定义输入文件
-	inputFiles := []string{
-		"1.ts",
-		"2.ts",
-		"3.ts",
-		"4.ts",
-		"5.ts",
-	}
-	
-	fmt.Println("开始测试输入文件预处理...")
-	
-	// 第一次分析（无缓存）
-	startTime := time.Now()
-	for i, file := range inputFiles {
-		fullPath := filepath.Join(wd, "video", file)
-		
-		fmt.Printf("分析文件 %d/%d: %s\n", i+1, len(inputFiles), file)
-		
-		info, err := cache.AnalyzeVideo(fullPath)
-		if err != nil {
-			fmt.Printf("分析文件 %s 失败: %v\n", file, err)
-			continue
+	// 预处理视频
+	fmt.Println("\n2. 预处理视频:")
+	if err := preprocessVideo(inputFile, preprocessedFile); err != nil {
+		fmt.Printf("   错误: %v\n", err)
+	} else {
+		// 分析预处理后的视频
+		fmt.Println("\n3. 分析预处理后的视频:")
+		if err := analyzeVideo(preprocessedFile); err != nil {
+			fmt.Printf("   错误: %v\n", err)
 		}
-		
-		fmt.Printf("  文件名: %s\n", info.FileName)
-		fmt.Printf("  文件大小: %.2f MB\n", float64(info.FileSize)/(1024*1024))
-		fmt.Printf("  时长: %.2f 秒\n", info.Duration)
-		fmt.Printf("  编码: %s\n", info.Codec)
-		fmt.Printf("  分辨率: %dx%d\n", info.Width, info.Height)
-		fmt.Printf("  FPS: %.2f\n", info.FPS)
-		fmt.Printf("  比特率: %d kbps\n", info.Bitrate/1000)
-		fmt.Println()
 	}
 	
-	firstAnalysisTime := time.Since(startTime)
-	fmt.Printf("第一次分析耗时: %v\n", firstAnalysisTime)
-	
-	// 第二次分析（使用缓存）
-	startTime = time.Now()
-	for i, file := range inputFiles {
-		fullPath := filepath.Join(wd, "video", file)
-		
-		fmt.Printf("缓存分析文件 %d/%d: %s\n", i+1, len(inputFiles), file)
-		
-		info, err := cache.AnalyzeVideo(fullPath)
-		if err != nil {
-			fmt.Printf("分析文件 %s 失败: %v\n", file, err)
-			continue
-		}
-		
-		fmt.Printf("  文件名: %s\n", info.FileName)
-		fmt.Printf("  文件大小: %.2f MB\n", float64(info.FileSize)/(1024*1024))
-		fmt.Printf("  时长: %.2f 秒\n", info.Duration)
-		fmt.Printf("  编码: %s\n", info.Codec)
-		fmt.Printf("  分辨率: %dx%d\n", info.Width, info.Height)
-		fmt.Printf("  FPS: %.2f\n", info.FPS)
-		fmt.Printf("  比特率: %d kbps\n", info.Bitrate/1000)
-		fmt.Println()
-	}
-	
-	secondAnalysisTime := time.Since(startTime)
-	fmt.Printf("缓存分析耗时: %v\n", secondAnalysisTime)
-	
-	// 计算性能提升
-	improvement := float64(firstAnalysisTime.Nanoseconds()-secondAnalysisTime.Nanoseconds()) / float64(firstAnalysisTime.Nanoseconds()) * 100
-	fmt.Printf("性能提升: %.2f%%\n", improvement)
-	
-	// 测试预处理功能
-	fmt.Println("\n测试预处理功能...")
-	preprocessStart := time.Now()
-	processedFiles, err := cache.PreprocessInputFiles(inputFiles, wd)
-	if err != nil {
-		fmt.Printf("预处理失败: %v\n", err)
-		return
-	}
-	preprocessTime := time.Since(preprocessStart)
-	
-	fmt.Printf("预处理完成，耗时: %v\n", preprocessTime)
-	fmt.Printf("处理后的文件列表:\n")
-	for i, file := range processedFiles {
-		fmt.Printf("  %d. %s\n", i+1, file)
-	}
+	fmt.Println("\n=== 视频预处理测试完成 ===")
 }

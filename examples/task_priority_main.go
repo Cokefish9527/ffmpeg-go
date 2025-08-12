@@ -1,4 +1,4 @@
-package main
+package example
 
 import (
 	"bytes"
@@ -6,8 +6,108 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"os"
+	"strings"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/u2takey/ffmpeg-go/api"
+	"github.com/u2takey/ffmpeg-go/queue"
+	"github.com/u2takey/ffmpeg-go/service"
 )
+
+// 模拟任务优先级处理
+func handleTaskWithPriority(taskID string, priority int, spec interface{}) {
+	fmt.Printf("处理任务 [%s] 优先级: %d\n", taskID, priority)
+	
+	// 模拟根据优先级调整处理时间
+	baseDelay := time.Duration(1000/priority) * time.Millisecond
+	time.Sleep(baseDelay)
+	
+	fmt.Printf("任务 [%s] 处理完成，耗时: %v\n", taskID, baseDelay)
+}
+
+// 模拟视频编辑API
+func simulateVideoEditAPI(c *gin.Context) {
+	// 解析请求
+	var req struct {
+		Spec     interface{} `json:"spec"`
+		Priority int         `json:"priority"`
+	}
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "无效请求"})
+		return
+	}
+	
+	// 生成任务ID
+	taskID := uuid.New().String()
+	
+	// 处理任务
+	go handleTaskWithPriority(taskID, req.Priority, req.Spec)
+	
+	// 返回响应
+	c.JSON(200, gin.H{
+		"taskId":  taskID,
+		"status":  "processing",
+		"message": "任务已提交",
+	})
+}
+
+func main() {
+	// 创建测试服务器
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	
+	// 注册路由
+	router.POST("/video/edit", simulateVideoEditAPI)
+	
+	// 准备测试任务
+	tasks := []struct {
+		Spec     interface{}
+		Priority int
+	}{
+		{map[string]interface{}{"type": "simple"}, 1},  // 低优先级
+		{map[string]interface{}{"type": "complex"}, 5}, // 高优先级
+		{map[string]interface{}{"type": "medium"}, 3},  // 中优先级
+		{map[string]interface{}{"type": "urgent"}, 10}, // 紧急优先级
+	}
+	
+	fmt.Println("=== 任务优先级处理测试 ===")
+	
+	// 发送测试请求
+	for i, task := range tasks {
+		// 构造请求
+		requestBody := map[string]interface{}{
+			"spec":     task.Spec,
+			"priority": task.Priority,
+		}
+		
+		jsonData, _ := json.Marshal(requestBody)
+		req, _ := http.NewRequest("POST", "/video/edit", bytes.NewBuffer(jsonData))
+		req.Header.Set("Content-Type", "application/json")
+		
+		// 创建响应记录器
+		w := httptest.NewRecorder()
+		
+		// 执行请求
+		fmt.Printf("\n发送任务 %d (优先级: %d)...\n", i+1, task.Priority)
+		router.ServeHTTP(w, req)
+		
+		// 读取响应
+		responseBody, _ := io.ReadAll(w.Body)
+		fmt.Printf("响应状态: %d\n", w.Code)
+		fmt.Printf("响应内容: %s\n", string(responseBody))
+	}
+	
+	// 等待所有任务完成
+	fmt.Println("\n等待所有任务完成...")
+	time.Sleep(3 * time.Second)
+	
+	fmt.Println("\n=== 任务优先级测试完成 ===")
+}
 
 // VideoEditRequest 视频编辑请求
 type VideoEditRequest struct {

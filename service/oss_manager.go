@@ -2,15 +2,12 @@ package service
 
 import (
 	"fmt"
-	"io"
 	"mime/multipart"
 	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
-
-	"github.com/google/uuid"
 )
 
 // OSSManager 提供OSS存储管理功能
@@ -87,174 +84,32 @@ func NewOSSManager(config OSSConfig) *OSSManager {
 
 // UploadFile 上传文件到OSS
 func (o *OSSManager) UploadFile(file multipart.File, header *multipart.FileHeader) (string, error) {
-	// 如果有真实的OSS服务，则使用真实服务
-	if o.ossService != nil {
-		return o.ossService.UploadFile(file, header)
+	// 必须使用真实的OSS服务，如果没有则返回错误
+	if o.ossService == nil {
+		return "", fmt.Errorf("OSS服务未初始化，请检查OSS配置")
 	}
 	
-	// 否则使用模拟实现
-	// 生成唯一文件名
-	fileExt := filepath.Ext(header.Filename)
-	fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
-	
-	// 创建临时文件
-	tempDir := os.TempDir()
-	tempFilePath := filepath.Join(tempDir, fileName)
-	
-	tempFile, err := os.Create(tempFilePath)
-	if err != nil {
-		return "", fmt.Errorf("创建临时文件失败: %w", err)
-	}
-	defer tempFile.Close()
-	defer os.Remove(tempFilePath) // 清理临时文件
-	
-	// 将上传的文件内容复制到临时文件
-	_, err = io.Copy(tempFile, file)
-	if err != nil {
-		return "", fmt.Errorf("保存临时文件失败: %w", err)
-	}
-	
-	// 在实际实现中，这里会使用阿里云OSS SDK上传文件
-	// 由于需要配置真实的访问凭证，暂时返回模拟的URL
-	// 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
-	bucketName := o.BucketName
-	if bucketName == "" {
-		bucketName = "aima-hotvideogeneration-videolibrary"
-	}
-	
-	endpoint := o.Endpoint
-	if endpoint == "" {
-		endpoint = "oss-cn-hangzhou.aliyuncs.com"
-	}
-	
-	ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, fileName)
-	
-	// 模拟上传过程
-	time.Sleep(100 * time.Millisecond)
-	
-	return ossURL, nil
+	return o.ossService.UploadFile(file, header)
 }
 
 // UploadFileToTsBucket 上传文件到TS OSS bucket
 func (o *OSSManager) UploadFileToTsBucket(file multipart.File, header *multipart.FileHeader, path string) (string, error) {
-    // 如果有真实的TS OSS服务，则使用真实服务
-    if o.tsOssService != nil {
-        return o.tsOssService.UploadFileWithPath(file, header, path)
+    // 必须使用真实的TS OSS服务，如果没有则返回错误
+    if o.tsOssService == nil {
+        return "", fmt.Errorf("TS OSS服务未初始化，请检查TS OSS配置")
     }
     
-    // 否则使用模拟实现
-    // 生成唯一文件名
-    fileExt := filepath.Ext(header.Filename)
-    fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
-    
-    // 创建临时文件
-    tempDir := os.TempDir()
-    tempFilePath := filepath.Join(tempDir, fileName)
-    
-    tempFile, err := os.Create(tempFilePath)
-    if err != nil {
-        return "", fmt.Errorf("创建临时文件失败: %w", err)
-    }
-    defer tempFile.Close()
-    defer os.Remove(tempFilePath) // 清理临时文件
-    
-    // 将上传的文件内容复制到临时文件
-    _, err = io.Copy(tempFile, file)
-    if err != nil {
-        return "", fmt.Errorf("保存临时文件失败: %w", err)
-    }
-    
-    // 在实际实现中，这里会使用阿里云OSS SDK上传文件
-    // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    // 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
-    bucketName := o.TsBucketName
-    if bucketName == "" {
-        bucketName = "aima-hotvideogeneration-mp4tots"
-    }
-    
-    endpoint := o.Endpoint
-    if endpoint == "" {
-        endpoint = "oss-cn-hangzhou.aliyuncs.com"
-    }
-    
-    // 修复路径分隔符问题，统一使用正斜杠
-    objectKey := fileName
-    if path != "" {
-        // 确保路径使用正斜杠
-        cleanPath := strings.ReplaceAll(path, "\\", "/")
-        cleanPath = strings.Trim(cleanPath, "/")
-        if cleanPath != "" {
-            objectKey = cleanPath + "/" + fileName
-        }
-    }
-    
-    ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectKey)
-    
-    // 模拟上传过程
-    time.Sleep(100 * time.Millisecond)
-    
-    return ossURL, nil
+    return o.tsOssService.UploadFileWithPath(file, header, path)
 }
 
 // UploadVideoOutput 上传视频编辑结果到输出bucket
 func (o *OSSManager) UploadVideoOutput(file multipart.File, header *multipart.FileHeader, path string) (string, error) {
-    // 如果有真实的视频输出OSS服务，则使用真实服务
-    if o.videoOutputOssService != nil {
-        return o.videoOutputOssService.UploadFileWithPath(file, header, path)
+    // 必须使用真实的视频输出OSS服务，如果没有则返回错误
+    if o.videoOutputOssService == nil {
+        return "", fmt.Errorf("视频输出OSS服务未初始化，请检查视频输出OSS配置")
     }
     
-    // 否则使用模拟实现
-    // 生成唯一文件名
-    fileExt := filepath.Ext(header.Filename)
-    fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
-    
-    // 创建临时文件
-    tempDir := os.TempDir()
-    tempFilePath := filepath.Join(tempDir, fileName)
-    
-    tempFile, err := os.Create(tempFilePath)
-    if err != nil {
-        return "", fmt.Errorf("创建临时文件失败: %w", err)
-    }
-    defer tempFile.Close()
-    defer os.Remove(tempFilePath) // 清理临时文件
-    
-    // 将上传的文件内容复制到临时文件
-    _, err = io.Copy(tempFile, file)
-    if err != nil {
-        return "", fmt.Errorf("保存临时文件失败: %w", err)
-    }
-    
-    // 在实际实现中，这里会使用阿里云OSS SDK上传文件
-    // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    // 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
-    bucketName := o.VideoOutputBucketName
-    if bucketName == "" {
-        bucketName = "aima-hotvideogeneration-videooutput"
-    }
-    
-    endpoint := o.Endpoint
-    if endpoint == "" {
-        endpoint = "oss-cn-hangzhou.aliyuncs.com"
-    }
-    
-    // 修复路径分隔符问题，统一使用正斜杠
-    objectKey := fileName
-    if path != "" {
-        // 确保路径使用正斜杠
-        cleanPath := strings.ReplaceAll(path, "\\", "/")
-        cleanPath = strings.Trim(cleanPath, "/")
-        if cleanPath != "" {
-            objectKey = cleanPath + "/" + fileName
-        }
-    }
-    
-    ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectKey)
-    
-    // 模拟上传过程
-    time.Sleep(100 * time.Millisecond)
-    
-    return ossURL, nil
+    return o.videoOutputOssService.UploadFileWithPath(file, header, path)
 }
 
 // ExtractUserIDFromURL 从URL中提取用户ID
@@ -277,63 +132,12 @@ func (o *OSSManager) ExtractUserIDFromURL(fileURL string) (string, error) {
 
 // UploadFileWithPath 上传文件到OSS指定路径
 func (o *OSSManager) UploadFileWithPath(file multipart.File, header *multipart.FileHeader, path string) (string, error) {
-    // 如果有真实的OSS服务，则使用真实服务
-    if o.ossService != nil {
-        return o.ossService.UploadFileWithPath(file, header, path)
+    // 必须使用真实的OSS服务，如果没有则返回错误
+    if o.ossService == nil {
+        return "", fmt.Errorf("OSS服务未初始化，请检查OSS配置")
     }
     
-    // 否则使用模拟实现
-    // 生成唯一文件名
-    fileExt := filepath.Ext(header.Filename)
-    fileName := fmt.Sprintf("%s%s", uuid.New().String(), fileExt)
-    
-    // 创建临时文件
-    tempDir := os.TempDir()
-    tempFilePath := filepath.Join(tempDir, fileName)
-    
-    tempFile, err := os.Create(tempFilePath)
-    if err != nil {
-        return "", fmt.Errorf("创建临时文件失败: %w", err)
-    }
-    defer tempFile.Close()
-    defer os.Remove(tempFilePath) // 清理临时文件
-    
-    // 将上传的文件内容复制到临时文件
-    _, err = io.Copy(tempFile, file)
-    if err != nil {
-        return "", fmt.Errorf("保存临时文件失败: %w", err)
-    }
-    
-    // 在实际实现中，这里会使用阿里云OSS SDK上传文件
-    // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    // 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
-    bucketName := o.BucketName
-    if bucketName == "" {
-        bucketName = "aima-hotvideogeneration-videolibrary"
-    }
-    
-    endpoint := o.Endpoint
-    if endpoint == "" {
-        endpoint = "oss-cn-hangzhou.aliyuncs.com"
-    }
-    
-    // 修复路径分隔符问题，统一使用正斜杠
-    objectKey := fileName
-    if path != "" {
-        // 确保路径使用正斜杠
-        cleanPath := strings.ReplaceAll(path, "\\", "/")
-        cleanPath = strings.Trim(cleanPath, "/")
-        if cleanPath != "" {
-            objectKey = cleanPath + "/" + fileName
-        }
-    }
-    
-    ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectKey)
-    
-    // 模拟上传过程
-    time.Sleep(100 * time.Millisecond)
-    
-    return ossURL, nil
+    return o.ossService.UploadFileWithPath(file, header, path)
 }
 
 // DownloadFile 从OSS下载文件
@@ -415,4 +219,39 @@ func (o *OSSManager) GetObjectURL(objectName string) string {
 	}
 	
 	return fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectName)
+}
+
+// UploadFileToVideoOutputBucket 上传文件到视频输出桶
+func (o *OSSManager) UploadFileToVideoOutputBucket(localFilePath, objectKey string) error {
+    // 必须使用真实的视频输出OSS服务，如果没有则返回错误
+    if o.videoOutputOssService == nil {
+        return fmt.Errorf("视频输出OSS服务未初始化，请检查视频输出OSS配置")
+    }
+    
+    // 打开本地文件
+    file, err := os.Open(localFilePath)
+    if err != nil {
+        return fmt.Errorf("打开本地文件失败: %w", err)
+    }
+    defer file.Close()
+    
+    // 获取文件信息
+    fileInfo, err := file.Stat()
+    if err != nil {
+        return fmt.Errorf("获取文件信息失败: %w", err)
+    }
+    
+    // 创建multipart.FileHeader
+    header := &multipart.FileHeader{
+        Filename: filepath.Base(localFilePath),
+        Size:     fileInfo.Size(),
+    }
+    
+    // 上传文件
+    _, err = o.videoOutputOssService.UploadFileWithPath(file, header, objectKey)
+    if err != nil {
+        return fmt.Errorf("上传文件到视频输出桶失败: %w", err)
+    }
+    
+    return nil
 }

@@ -18,9 +18,18 @@ type OSSService struct {
 
 // NewOSSService 创建一个新的OSS服务实例
 func NewOSSService(endpoint, accessKeyID, accessKeySecret, bucketName string) (*OSSService, error) {
-	// 如果配置为空，则返回nil，使用模拟实现
-	if endpoint == "" || accessKeyID == "" || accessKeySecret == "" || bucketName == "" {
-		return nil, nil
+	// 检查必要配置是否存在
+	if endpoint == "" {
+		return nil, fmt.Errorf("endpoint不能为空")
+	}
+	if accessKeyID == "" {
+		return nil, fmt.Errorf("accessKeyID不能为空")
+	}
+	if accessKeySecret == "" {
+		return nil, fmt.Errorf("accessKeySecret不能为空")
+	}
+	if bucketName == "" {
+		return nil, fmt.Errorf("bucketName不能为空")
 	}
 
 	// 创建OSS客户端

@@ -1,4 +1,4 @@
-package main
+package example
 
 import (
 	"fmt"
@@ -11,7 +11,7 @@ import (
 	"github.com/u2takey/ffmpeg-go/queue"
 )
 
-func main() {
+func ConvertMP4ToTS() {
 	// 指定要处理的目录
 	inputDir := "./temp"
 	
@@ -52,7 +52,7 @@ func main() {
 				ID:   taskID,
 				Spec: map[string]interface{}{
 					"source":   path,
-					"taskType": "materialPreprocess",
+					"taskType": "convertMP4ToTS",
 				},
 				Status:   "pending",
 				Created:  time.Now(),

@@ -27,32 +27,24 @@ type SmartUploadResponse struct {
 	IsVideo     bool   `json:"is_video"`
 }
 
-// SmartUpload godoc
-// @Summary 智能文件上传
-// @Description 接收文件流，原始文件统一上传到bucket：aima-hotvideogeneration-videolibrary，
-// @Description 如果原始文件是视频文件，则额外进行一次转换成ts格式的操作，
-// @Description 软换完成后，将ts文件上传到bucket：aima-hotvideogeneration-mp4tots，
-// @Description 上传到对应bucket的目录规则都是一样的，存放在userId的目录下
+// SmartUpload 智能上传处理函数
+// @Summary 智能上传
+// @Description 根据文件类型决定处理方式，视频文件会转换为TS格式
 // @Tags video
 // @Accept mpfd
 // @Produce json
-// @Param userId query string true "用户ID"
-// @Param file formData file true "要上传的文件"
-// @Success 200 {object} SmartUploadResponse "文件上传成功"
+// @Param file formData file true "上传的文件"
+// @Param userId formData string false "用户ID"
+// @Success 200 {object} SmartUploadResponse "上传成功"
 // @Failure 400 {object} map[string]string "请求参数错误"
 // @Failure 500 {object} map[string]string "内部服务器错误"
 // @Router /video/smart-upload [post]
 func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	// 获取用户ID参数
-	userID := c.Query("userId")
-	if userID == "" {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "缺少必要的参数: userId",
-		})
-		return
-	}
+	userID := c.PostForm("userId")
+	fmt.Printf("收到文件上传请求，用户ID: %s\n", userID)
 
-	// 从请求中获取上传的文件
+	// 获取上传的文件
 	file, header, err := c.Request.FormFile("file")
 	if err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{
@@ -89,8 +81,10 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	// 检查是否为视频文件
 	isVideo, err := isVideoFile(tempFilePath)
 	if err != nil {
-		// 即使检测出错，也记录日志并继续处理
-		fmt.Printf("检查文件类型时出错: %v\n", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "检查文件类型时出错: " + err.Error(),
+		})
+		return
 	}
 	
 	// 打印调试信息
@@ -113,7 +107,15 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	}
 
 	// 将原始文件上传到主bucket的用户目录下
-	originalURL, err := ossManager.UploadFileWithPath(originalFile, originalHeader, userID)
+	var originalURL string
+	if userID != "" {
+		// 如果提供了用户ID，则上传到用户目录
+		originalURL, err = ossManager.UploadFileWithPath(originalFile, originalHeader, userID)
+	} else {
+		// 如果没有提供用户ID，则上传到根目录
+		originalURL, err = ossManager.UploadFileWithPath(originalFile, originalHeader, "")
+	}
+	
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"error": "原始文件上传失败: " + err.Error(),
@@ -147,7 +149,7 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	if isVideo {
 		response.TsURL = tsURL
 	}
-	
+
 	c.JSON(http.StatusOK, response)
 }
 
@@ -250,12 +252,23 @@ func processVideoFileToTs(inputPath, originalFilename, userID string, ossManager
 	}
 
 	// 上传到TS OSS bucket，使用用户ID作为目录
-	url, err := ossManager.UploadFileToTsBucket(convertedFile, newHeader, userID)
+	var url string
+	if userID != "" {
+		// 如果提供了用户ID，则上传到用户目录
+		url, err = ossManager.UploadFileToTsBucket(convertedFile, newHeader, userID)
+	} else {
+		// 如果没有提供用户ID，则上传到根目录
+		url, err = ossManager.UploadFileToTsBucket(convertedFile, newHeader, "")
+	}
+	
 	if err != nil {
 		return "", fmt.Errorf("上传TS文件到OSS失败: %w", err)
 	}
 	
 	fmt.Printf("TS文件上传成功，URL: %s\n", url)
+
+	// 清理临时文件
+	defer os.Remove(outputPath)
 
 	return url, nil
 }

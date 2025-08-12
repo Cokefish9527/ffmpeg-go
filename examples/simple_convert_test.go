@@ -1,64 +1,57 @@
-package main
+package example
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"strings"
+	"testing"
+	"time"
 
-	"github.com/u2takey/ffmpeg-go/service"
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
-func main() {
-	// 指定要处理的目录
-	inputDir := "./temp"
-	
-	// 检查目录是否存在
-	if _, err := os.Stat(inputDir); os.IsNotExist(err) {
-		fmt.Printf("目录 %s 不存在\n", inputDir)
-		return
+// TestSimpleConvert 测试基本的视频转换功能
+func TestSimpleConvert(t *testing.T) {
+	// 输入和输出文件路径
+	inputFile := "./sample_data/in1.mp4"
+	outputFile := "./sample_data/simple_convert_test_output.mp4"
+
+	// 确保输出目录存在
+	outputDir := filepath.Dir(outputFile)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		t.Fatalf("创建输出目录失败: %v", err)
 	}
-	
-	// 创建素材预处理服务
-	preprocessor := service.NewMaterialPreprocessorService()
-	
-	// 遍历目录中的所有mp4文件
-	filepath.Walk(inputDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		
-		// 只处理mp4文件
-		if !info.IsDir() && strings.ToLower(filepath.Ext(path)) == ".mp4" {
-			fmt.Printf("准备转换文件: %s\n", path)
-			
-			// 生成输出文件路径 (TS格式)
-			ext := filepath.Ext(path)
-			outputFile := path[0:len(path)-len(ext)] + ".ts"
-			
-			// 创建任务对象
-			task := &service.Task{
-				ID:       "test-task",
-				Spec: map[string]interface{}{
-					"source":   path,
-					"taskType": "materialPreprocess",
-				},
-				Status:   "pending",
-				Progress: 0.0,
-			}
-			
-			// 处理任务
-			err := preprocessor.Process(task)
-			if err != nil {
-				fmt.Printf("转换文件 %s 失败: %v\n", path, err)
-				return nil
-			}
-			
-			fmt.Printf("✓ 成功转换文件: %s -> %s\n", path, outputFile)
-		}
-		
-		return nil
-	})
-	
-	fmt.Println("所有转换任务已完成")
+
+	// 记录开始时间
+	startTime := time.Now()
+
+	// 执行转换
+	err := ffmpeg.Input(inputFile).
+		Output(outputFile, ffmpeg.KwArgs{
+			"vcodec": "libx264",
+			"preset": "medium",
+			"crf":    23,
+			"acodec": "aac",
+			"b:a":    "128k",
+		}).
+		OverWriteOutput().
+		Run()
+
+	// 计算执行时间
+	duration := time.Since(startTime)
+
+	if err != nil {
+		t.Fatalf("转换失败: %v", err)
+	}
+
+	// 检查输出文件是否存在
+	if _, err := os.Stat(outputFile); os.IsNotExist(err) {
+		t.Fatalf("输出文件未创建: %v", err)
+	}
+
+	// 输出执行时间
+	fmt.Printf("转换成功，耗时: %v\n", duration)
+
+	// 清理输出文件
+	// defer os.Remove(outputFile)
 }

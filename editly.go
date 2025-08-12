@@ -5,7 +5,9 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"path/filepath"
 	"strings"
+	"time"
 )
 
 // EditSpec 视频编辑规范
@@ -58,8 +60,72 @@ func (e *Editly) Edit() error {
 		return fmt.Errorf("输入验证失败: %w", err)
 	}
 
+	// 确保输出目录存在
+	outputDir := filepath.Dir(e.spec.OutPath)
+	if err := os.MkdirAll(outputDir, 0755); err != nil {
+		return fmt.Errorf("创建输出目录失败: %w", err)
+	}
+
+	// 构建FFmpeg命令
+	args := []string{"-y"} // 覆盖输出文件
+
+	// 为每个clip添加输入
+	for _, clip := range e.spec.Clips {
+		for _, layer := range clip.Layers {
+			if layer.Type == "video" && layer.Path != "" {
+				args = append(args, "-i", layer.Path)
+			}
+		}
+	}
+
+	// 构建过滤器链
+	var filterChain []string
+	inputIndex := 0
+
+	for _, clip := range e.spec.Clips {
+		for _, layer := range clip.Layers {
+			if layer.Type == "video" && layer.Path != "" {
+				// 为每个视频输入创建标签
+				filterChain = append(filterChain, fmt.Sprintf("[%d:v]scale=%d:%d[v%d]", 
+					inputIndex, e.spec.Width, e.spec.Height, inputIndex))
+				inputIndex++
+			} else if layer.Type == "image" && layer.Path != "" {
+				// 图片处理
+				filterChain = append(filterChain, fmt.Sprintf("[%d:v]scale=%d:%d[img%d]", 
+					inputIndex, e.spec.Width, e.spec.Height, inputIndex))
+				inputIndex++
+			}
+		}
+	}
+
+	// 添加过滤器参数
+	if len(filterChain) > 0 {
+		args = append(args, "-filter_complex", strings.Join(filterChain, ";"))
+	}
+
+	// 设置输出参数
+	args = append(args, 
+		"-c:v", "libx264",
+		"-preset", "ultrafast",
+		"-crf", "23",
+		"-r", fmt.Sprintf("%d", e.spec.Fps),
+		"-pix_fmt", "yuv420p",
+		e.spec.OutPath)
+
 	if e.spec.Verbose {
-		log.Printf("视频编辑完成: %s", e.spec.OutPath)
+		log.Printf("执行FFmpeg命令: ffmpeg %s", strings.Join(args, " "))
+	}
+
+	// 执行FFmpeg命令
+	startTime := time.Now()
+	err := Input("").Output(e.spec.OutPath, nil).OverWriteOutput().Run()
+	if err != nil {
+		return fmt.Errorf("视频编辑失败: %w", err)
+	}
+
+	executionTime := time.Since(startTime)
+	if e.spec.Verbose {
+		log.Printf("视频编辑完成: %s，耗时: %v", e.spec.OutPath, executionTime)
 	}
 
 	return nil
@@ -71,11 +137,11 @@ func (e *Editly) validateInputs() error {
 		log.Println("验证输入文件...")
 	}
 
-	for i, clip := range e.spec.Clips {
-		for j, layer := range clip.Layers {
-			if layer.Type == "video" && layer.Path != "" {
+	for _, clip := range e.spec.Clips {
+		for _, layer := range clip.Layers {
+			if (layer.Type == "video" || layer.Type == "image") && layer.Path != "" {
 				if e.spec.Verbose {
-					log.Printf("验证片段 %d, 层 %d: %s", i+1, j+1, layer.Path)
+					log.Printf("验证层: %s", layer.Path)
 				}
 				
 				// 检查文件是否存在
@@ -87,10 +153,7 @@ func (e *Editly) validateInputs() error {
 				} else {
 					// 对于本地文件，检查文件是否存在
 					if _, err := os.Stat(layer.Path); os.IsNotExist(err) {
-						// 注意：对于示例，我们只打印警告而不返回错误
-						if e.spec.Verbose {
-							log.Printf("警告: 文件不存在: %s", layer.Path)
-						}
+						return fmt.Errorf("文件不存在: %s", layer.Path)
 					}
 				}
 			}
@@ -99,7 +162,6 @@ func (e *Editly) validateInputs() error {
 
 	return nil
 }
-
 
 // Edit 是一个便捷函数，直接编辑视频
 func Edit(spec *EditSpec) error {

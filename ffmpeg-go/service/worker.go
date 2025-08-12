@@ -3,10 +3,8 @@ package service
 import (
 	"fmt"
 	"log"
-	"mime/multipart"
 	"os"
 	"path/filepath"
-	"strings"
 	"sync"
 	"time"
 

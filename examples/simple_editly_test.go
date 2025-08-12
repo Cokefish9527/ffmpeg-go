@@ -1,4 +1,4 @@
-package examples
+package example
 
 import (
 	ffmpeg "github.com/u2takey/ffmpeg-go"

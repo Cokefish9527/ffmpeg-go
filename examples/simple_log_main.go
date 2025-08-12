@@ -1,9 +1,10 @@
-package main
+package example
 
 import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"testing"
 
 	"github.com/u2takey/ffmpeg-go/utils"
 )

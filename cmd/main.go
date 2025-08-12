@@ -90,6 +90,14 @@ func main() {
 	// 设置全局任务队列
 	api.SetTaskQueue(taskQueue)
 
+	// 初始化OSS管理器
+	ossConfig := loadOSSConfig()
+	ossManager := service.NewOSSManager(*ossConfig)
+	ossController := api.NewOSSController(ossManager)
+	
+	// 设置全局OSS管理器
+	api.SetOSSManager(ossManager)
+
 	// 初始化工作池
 	workerPool := service.NewWorkerPool(3, taskQueue)
 
@@ -101,11 +109,6 @@ func main() {
 
 	// 确保程序退出时停止工作池
 	defer workerPool.Stop()
-
-	// 初始化OSS管理器
-	ossConfig := loadOSSConfig()
-	ossManager := service.NewOSSManager(*ossConfig)
-	ossController := api.NewOSSController(ossManager)
 
 	// 启动HTTP服务器
 	router := gin.Default()
@@ -155,7 +158,7 @@ func main() {
 
 		// 视频URL处理接口
 		v1.POST("/video/url", func(c *gin.Context) {
-			api.HandleVideoURL(c, taskQueue)
+			api.HandleVideoURL(c)
 		})
 
 		// 智能上传接口 - 根据文件类型决定处理方式
@@ -193,35 +196,44 @@ func downloadFile(url, filepath string) error {
 
 // OSSConfig OSS配置结构体
 type OSSConfig struct {
-	Endpoint        string `json:"endpoint"`
-	AccessKeyID     string `json:"access_key_id"`
-	AccessKeySecret string `json:"access_key_secret"`
-	BucketName      string `json:"bucket_name"`
-	TsBucketName    string `json:"ts_bucket_name"`
+	Endpoint              string `json:"endpoint"`
+	AccessKeyID          string `json:"access_key_id"`
+	AccessKeySecret      string `json:"access_key_secret"`
+	BucketName           string `json:"bucket_name"`
+	TsBucketName         string `json:"ts_bucket_name"`
+	VideoOutputBucketName string `json:"video_output_bucket_name"`
 }
 
 // loadOSSConfig 从配置文件加载OSS配置
 func loadOSSConfig() *service.OSSConfig {
-	config := &service.OSSConfig{}
+	config := &OSSConfig{}  // 使用本地OSSConfig结构体
 
 	// 检查配置文件是否存在
 	if _, err := os.Stat("config/oss_config.json"); os.IsNotExist(err) {
 		fmt.Println("OSS配置文件不存在，使用空配置")
-		return config
+		return &service.OSSConfig{}  // 返回service.OSSConfig
 	}
 
 	// 读取配置文件
 	data, err := os.ReadFile("config/oss_config.json")
 	if err != nil {
 		fmt.Printf("读取OSS配置文件失败: %v\n", err)
-		return config
+		return &service.OSSConfig{}
 	}
 
-	// 解析JSON配置
+	// 解析JSON配置到本地结构体
 	if err := json.Unmarshal(data, config); err != nil {
 		fmt.Printf("解析OSS配置文件失败: %v\n", err)
-		return config
+		return &service.OSSConfig{}
 	}
 
-	return config
+	// 转换为service.OSSConfig
+	return &service.OSSConfig{
+		Endpoint:              config.Endpoint,
+		AccessKeyID:          config.AccessKeyID,
+		AccessKeySecret:      config.AccessKeySecret,
+		BucketName:           config.BucketName,
+		TsBucketName:         config.TsBucketName,
+		VideoOutputBucketName: config.VideoOutputBucketName,
+	}
 }

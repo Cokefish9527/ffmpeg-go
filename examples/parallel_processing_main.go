@@ -1,64 +1,69 @@
-package main
+package example
 
 import (
 	"fmt"
-	"os"
-	"path/filepath"
+	"sync"
 	"time"
 
-	"github.com/u2takey/ffmpeg-go/service"
+	ffmpeg "github.com/u2takey/ffmpeg-go"
 )
 
+// 视频处理任务结构
+type VideoTask struct {
+	InputFile  string
+	OutputFile string
+	Preset     string
+}
+
+// 执行单个视频处理任务
+func processVideoTask(task VideoTask, wg *sync.WaitGroup) {
+	defer wg.Done()
+	
+	start := time.Now()
+	fmt.Printf("开始处理: %s -> %s (预设: %s)\n", task.InputFile, task.OutputFile, task.Preset)
+	
+	err := ffmpeg.Input(task.InputFile).
+		Output(task.OutputFile, ffmpeg.KwArgs{
+			"vcodec": "libx264",
+			"preset": task.Preset,
+			"crf":    23,
+		}).
+		OverWriteOutput().
+		Run()
+	
+	duration := time.Since(start)
+	
+	if err != nil {
+		fmt.Printf("处理失败 %s: %v\n", task.InputFile, err)
+	} else {
+		fmt.Printf("处理完成 %s -> %s，耗时: %v (预设: %s)\n", 
+			task.InputFile, task.OutputFile, duration, task.Preset)
+	}
+}
+
 func main() {
-	// 创建测试用的Worker
-	taskQueue := service.NewInMemoryTaskQueue()
-	worker := service.NewWorker(taskQueue)
+	fmt.Println("=== 并行视频处理测试 ===")
 	
-	// 获取当前工作目录
-	wd, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("无法获取当前工作目录: %v\n", err)
-		return
+	// 定义处理任务
+	tasks := []VideoTask{
+		{"./sample_data/in1.mp4", "./sample_data/parallel_output1.mp4", "ultrafast"},
+		{"./sample_data/in2.mp4", "./sample_data/parallel_output2.mp4", "fast"},
+		{"./sample_data/in3.mp4", "./sample_data/parallel_output3.mp4", "medium"},
 	}
 	
-	// 定义输入文件
-	inputFiles := []string{
-		"1.ts",
-		"2.ts",
-		"3.ts",
-		"4.ts",
-		"5.ts",
-	}
+	var wg sync.WaitGroup
 	
-	fmt.Println("开始测试并行解码功能...")
-	
-	// 测试并行解码
+	// 并行处理所有任务
 	startTime := time.Now()
-	decodedFiles, err := worker.ParallelDecodeForTest(inputFiles, wd)
-	if err != nil {
-		fmt.Printf("并行解码失败: %v\n", err)
-		return
+	for _, task := range tasks {
+		wg.Add(1)
+		go processVideoTask(task, &wg)
 	}
 	
-	decodeTime := time.Since(startTime)
-	fmt.Printf("并行解码完成，耗时: %v\n", decodeTime)
+	// 等待所有任务完成
+	wg.Wait()
 	
-	fmt.Printf("解码后的文件列表:\n")
-	for i, file := range decodedFiles {
-		// 检查文件是否存在
-		if _, err := os.Stat(file); err == nil {
-			// 获取文件信息
-			fileInfo, _ := os.Stat(file)
-			fmt.Printf("  %d. %s (大小: %.2f MB)\n", i+1, filepath.Base(file), float64(fileInfo.Size())/(1024*1024))
-		} else {
-			fmt.Printf("  %d. %s (文件不存在)\n", i+1, filepath.Base(file))
-		}
-	}
-	
-	// 清理临时文件
-	if len(decodedFiles) > 0 {
-		tempDir := filepath.Dir(decodedFiles[0])
-		os.RemoveAll(tempDir)
-		fmt.Printf("\n已清理临时目录: %s\n", tempDir)
-	}
+	totalDuration := time.Since(startTime)
+	fmt.Printf("\n所有任务完成，总耗时: %v\n", totalDuration)
+	fmt.Println("=== 并行处理测试完成 ===")
 }

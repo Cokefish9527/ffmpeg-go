@@ -1,4 +1,4 @@
-package main
+package example
 
 import (
 	"bytes"
@@ -8,12 +8,115 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"os/exec"
-	"path/filepath"
+	"strings"
 	"time"
 
-	// "github.com/google/uuid"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/u2takey/ffmpeg-go/api"
+	"github.com/u2takey/ffmpeg-go/queue"
+	"github.com/u2takey/ffmpeg-go/service"
 )
+
+// VideoMergeRequest 视频合并请求
+type VideoMergeRequest struct {
+	Videos   []string `json:"videos"`
+	OutPath  string   `json:"outPath"`
+	Width    int      `json:"width"`
+	Height   int      `json:"height"`
+	Fps      int      `json:"fps"`
+	Duration float64  `json:"duration"`
+}
+
+// VideoMergeResponse 视频合并响应
+type VideoMergeResponse struct {
+	TaskID  string `json:"taskId"`
+	Status  string `json:"status"`
+	Message string `json:"message"`
+}
+
+// 模拟视频合并处理
+func handleVideoMerge(taskID string, req VideoMergeRequest) {
+	fmt.Printf("开始处理视频合并任务 [%s]\n", taskID)
+	fmt.Printf("合并 %d 个视频片段\n", len(req.Videos))
+	
+	// 模拟处理时间
+	time.Sleep(time.Duration(len(req.Videos)) * 500 * time.Millisecond)
+	
+	fmt.Printf("视频合并任务 [%s] 完成\n", taskID)
+}
+
+// 模拟视频合并API
+func simulateVideoMergeAPI(c *gin.Context) {
+	// 解析请求
+	var req VideoMergeRequest
+	
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(400, gin.H{"error": "无效请求"})
+		return
+	}
+	
+	// 生成任务ID
+	taskID := uuid.New().String()
+	
+	// 处理任务
+	go handleVideoMerge(taskID, req)
+	
+	// 返回响应
+	c.JSON(200, VideoMergeResponse{
+		TaskID:  taskID,
+		Status:  "processing",
+		Message: "任务已提交",
+	})
+}
+
+func main() {
+	// 创建测试服务器
+	gin.SetMode(gin.TestMode)
+	router := gin.New()
+	
+	// 注册路由
+	router.POST("/video/merge", simulateVideoMergeAPI)
+	
+	// 准备测试请求
+	testReq := VideoMergeRequest{
+		Videos: []string{
+			"./sample_data/clip1.mp4",
+			"./sample_data/clip2.mp4",
+			"./sample_data/clip3.mp4",
+		},
+		OutPath:  "./sample_data/merged_output.mp4",
+		Width:    1920,
+		Height:   1080,
+		Fps:      30,
+		Duration: 30.0,
+	}
+	
+	fmt.Println("=== 视频合并处理测试 ===")
+	
+	// 发送测试请求
+	jsonData, _ := json.Marshal(testReq)
+	req, _ := http.NewRequest("POST", "/video/merge", bytes.NewBuffer(jsonData))
+	req.Header.Set("Content-Type", "application/json")
+	
+	// 创建响应记录器
+	w := httptest.NewRecorder()
+	
+	// 执行请求
+	fmt.Println("\n发送视频合并请求...")
+	router.ServeHTTP(w, req)
+	
+	// 读取响应
+	responseBody, _ := io.ReadAll(w.Body)
+	fmt.Printf("响应状态: %d\n", w.Code)
+	fmt.Printf("响应内容: %s\n", string(responseBody))
+	
+	// 等待任务完成
+	fmt.Println("\n等待任务完成...")
+	time.Sleep(2 * time.Second)
+	
+	fmt.Println("\n=== 视频合并测试完成 ===")
+}
 
 // VideoEditRequest 视频编辑请求
 type VideoEditRequest struct {
