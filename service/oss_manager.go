@@ -116,7 +116,18 @@ func (o *OSSManager) UploadFile(file multipart.File, header *multipart.FileHeade
 	
 	// 在实际实现中，这里会使用阿里云OSS SDK上传文件
 	// 由于需要配置真实的访问凭证，暂时返回模拟的URL
-	ossURL := fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, fileName) // 使用生成的UUID文件名
+	// 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
+	bucketName := o.BucketName
+	if bucketName == "" {
+		bucketName = "aima-hotvideogeneration-videolibrary"
+	}
+	
+	endpoint := o.Endpoint
+	if endpoint == "" {
+		endpoint = "oss-cn-hangzhou.aliyuncs.com"
+	}
+	
+	ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, fileName)
 	
 	// 模拟上传过程
 	time.Sleep(100 * time.Millisecond)
@@ -155,7 +166,29 @@ func (o *OSSManager) UploadFileToTsBucket(file multipart.File, header *multipart
     
     // 在实际实现中，这里会使用阿里云OSS SDK上传文件
     // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    ossURL := fmt.Sprintf("https://%s.%s/%s", o.TsBucketName, o.Endpoint, filepath.Join(path, fileName))
+    // 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
+    bucketName := o.TsBucketName
+    if bucketName == "" {
+        bucketName = "aima-hotvideogeneration-mp4tots"
+    }
+    
+    endpoint := o.Endpoint
+    if endpoint == "" {
+        endpoint = "oss-cn-hangzhou.aliyuncs.com"
+    }
+    
+    // 修复路径分隔符问题，统一使用正斜杠
+    objectKey := fileName
+    if path != "" {
+        // 确保路径使用正斜杠
+        cleanPath := strings.ReplaceAll(path, "\\", "/")
+        cleanPath = strings.Trim(cleanPath, "/")
+        if cleanPath != "" {
+            objectKey = cleanPath + "/" + fileName
+        }
+    }
+    
+    ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectKey)
     
     // 模拟上传过程
     time.Sleep(100 * time.Millisecond)
@@ -194,7 +227,29 @@ func (o *OSSManager) UploadVideoOutput(file multipart.File, header *multipart.Fi
     
     // 在实际实现中，这里会使用阿里云OSS SDK上传文件
     // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    ossURL := fmt.Sprintf("https://%s.%s/%s", o.VideoOutputBucketName, o.Endpoint, filepath.Join(path, fileName))
+    // 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
+    bucketName := o.VideoOutputBucketName
+    if bucketName == "" {
+        bucketName = "aima-hotvideogeneration-videooutput"
+    }
+    
+    endpoint := o.Endpoint
+    if endpoint == "" {
+        endpoint = "oss-cn-hangzhou.aliyuncs.com"
+    }
+    
+    // 修复路径分隔符问题，统一使用正斜杠
+    objectKey := fileName
+    if path != "" {
+        // 确保路径使用正斜杠
+        cleanPath := strings.ReplaceAll(path, "\\", "/")
+        cleanPath = strings.Trim(cleanPath, "/")
+        if cleanPath != "" {
+            objectKey = cleanPath + "/" + fileName
+        }
+    }
+    
+    ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectKey)
     
     // 模拟上传过程
     time.Sleep(100 * time.Millisecond)
@@ -251,7 +306,29 @@ func (o *OSSManager) UploadFileWithPath(file multipart.File, header *multipart.F
     
     // 在实际实现中，这里会使用阿里云OSS SDK上传文件
     // 由于需要配置真实的访问凭证，暂时返回模拟的URL
-    ossURL := fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, filepath.Join(path, fileName)) // 使用生成的UUID文件名
+    // 修复URL格式问题，确保即使在模拟模式下也返回正确的URL格式
+    bucketName := o.BucketName
+    if bucketName == "" {
+        bucketName = "aima-hotvideogeneration-videolibrary"
+    }
+    
+    endpoint := o.Endpoint
+    if endpoint == "" {
+        endpoint = "oss-cn-hangzhou.aliyuncs.com"
+    }
+    
+    // 修复路径分隔符问题，统一使用正斜杠
+    objectKey := fileName
+    if path != "" {
+        // 确保路径使用正斜杠
+        cleanPath := strings.ReplaceAll(path, "\\", "/")
+        cleanPath = strings.Trim(cleanPath, "/")
+        if cleanPath != "" {
+            objectKey = cleanPath + "/" + fileName
+        }
+    }
+    
+    ossURL := fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectKey)
     
     // 模拟上传过程
     time.Sleep(100 * time.Millisecond)
@@ -327,5 +404,15 @@ func (o *OSSManager) GetObjectURL(objectName string) string {
 	
 	// 否则使用模拟实现
 	// 使用与UploadFileWithPath一致的URL格式
-	return fmt.Sprintf("https://%s.%s/%s", o.BucketName, o.Endpoint, objectName)
+	bucketName := o.BucketName
+	if bucketName == "" {
+		bucketName = "aima-hotvideogeneration-videolibrary"
+	}
+	
+	endpoint := o.Endpoint
+	if endpoint == "" {
+		endpoint = "oss-cn-hangzhou.aliyuncs.com"
+	}
+	
+	return fmt.Sprintf("https://%s.%s/%s", bucketName, endpoint, objectName)
 }

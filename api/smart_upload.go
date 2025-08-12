@@ -207,10 +207,12 @@ func processVideoFileToTs(inputPath, originalFilename, userID string, ossManager
 	nameWithoutExt := strings.TrimSuffix(originalFilename, ext)
 	outputFilename := fmt.Sprintf("%s_%s.ts", nameWithoutExt, uuid.New().String())
 	
-	// 修正outputPath的生成方式
-    outputPath := filepath.Join(filepath.Dir(inputPath), fmt.Sprintf("%s%s", uuid.New().String(), ".ts"))
+	// 修正outputPath的生成方式，确保使用正确的路径分隔符
+	outputDir := filepath.Dir(inputPath)
+	filename := fmt.Sprintf("%s%s", uuid.New().String(), ".ts")
+	outputPath := filepath.Join(outputDir, filename)
 	
-	fmt.Printf("输入文件: %s, 输出文件: %s\n", inputPath, outputPath)
+	fmt.Printf("输入文件: %s, 输出文件: %s, 输出目录: %s\n", inputPath, outputPath, outputDir)
 
 	// 使用FFmpeg转换为TS格式
 	err := ffmpeg_go.Input(inputPath).
