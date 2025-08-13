@@ -42,7 +42,7 @@ type SmartUploadResponse struct {
 func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	// 获取用户ID参数
 	userID := c.PostForm("userId")
-	fmt.Printf("收到文件上传请求，用户ID: %s\n", userID)
+	fmt.Printf("收到文件上传请求，用户ID: '%s'\n", userID)
 
 	// 获取上传的文件
 	file, header, err := c.Request.FormFile("file")
@@ -110,9 +110,11 @@ func SmartUpload(c *gin.Context, ossManager *service.OSSManager) {
 	var originalURL string
 	if userID != "" {
 		// 如果提供了用户ID，则上传到用户目录
+		fmt.Printf("上传原始文件到用户目录: %s\n", userID)
 		originalURL, err = ossManager.UploadFileWithPath(originalFile, originalHeader, userID)
 	} else {
 		// 如果没有提供用户ID，则上传到根目录
+		fmt.Printf("上传原始文件到根目录\n")
 		originalURL, err = ossManager.UploadFileWithPath(originalFile, originalHeader, "")
 	}
 	
@@ -255,9 +257,11 @@ func processVideoFileToTs(inputPath, originalFilename, userID string, ossManager
 	var url string
 	if userID != "" {
 		// 如果提供了用户ID，则上传到用户目录
+		fmt.Printf("上传TS文件到用户目录: %s\n", userID)
 		url, err = ossManager.UploadFileToTsBucket(convertedFile, newHeader, userID)
 	} else {
 		// 如果没有提供用户ID，则上传到根目录
+		fmt.Printf("上传TS文件到根目录\n")
 		url, err = ossManager.UploadFileToTsBucket(convertedFile, newHeader, "")
 	}
 	

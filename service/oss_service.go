@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"path/filepath"
+	"strings"
 
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
 	"github.com/google/uuid"
@@ -65,11 +66,11 @@ func (o *OSSService) UploadFileWithPath(file multipart.File, header *multipart.F
     // 构造对象Key，包含路径和唯一文件名
     objectKey := uniqueFileName
     if path != "" {
-        // 确保路径以'/'结尾
-        if path[len(path)-1] != '/' {
-            path += "/"
+        // 清理路径，移除首尾的斜杠
+        cleanPath := strings.Trim(path, "/")
+        if cleanPath != "" {
+            objectKey = cleanPath + "/" + uniqueFileName
         }
-        objectKey = path + uniqueFileName
     }
 
     // 上传到OSS
