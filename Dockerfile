@@ -46,6 +46,9 @@ WORKDIR /app
 # 从构建阶段复制编译好的二进制文件
 COPY --from=builder /app/ffmpeg-go ./ffmpeg-go
 
+# 从构建阶段复制配置文件
+COPY --from=builder /app/config ./config
+
 # 创建必要的目录
 RUN mkdir -p data temp
 
